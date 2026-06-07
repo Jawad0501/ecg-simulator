@@ -1,0 +1,2093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ECG Educational Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#FAFAF8;--paper:#FFF5F5;--accent:#C0392B;--navy:#2C3E50;
+  --sidebar-w:320px;--sidebar-overlay-w:min(320px,88vw);--border:#E0DDD8;--amber:#E67E22;--crit:#C0392B;
+  --grey:#7F8C8D;--shadow:0 2px 8px rgba(44,62,80,.08);
+  --px-per-mm:3;--speed:25;--gain:10;
+  --ecg-cols:4;--ecg-rows:3;--ecg-cell-aspect:2.4;--ecg-cell-min-h:0px;--rhythm-h:18%;
+}
+html,body{height:100%;font-family:'Source Sans 3',sans-serif;background:var(--bg);color:var(--navy);overflow:hidden}
+h1,h2,h3,h4,.serif{font-family:'Libre Baskerville',serif}
+.app{display:flex;flex-direction:column;height:100vh}
+header{padding:14px 24px;border-bottom:1px solid var(--border);background:#fff}
+header h1{font-size:1.35rem;color:var(--navy);letter-spacing:.02em}
+header p{font-size:.82rem;color:var(--grey);margin-top:2px}
+.main{display:flex;flex:1;overflow:hidden;min-height:0;position:relative}
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:#fff;border-right:1px solid var(--border);box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden;position:relative;transition:width .22s ease,min-width .22s ease;z-index:5}
+.sidebar.collapsed{width:0;min-width:0;border-right:none;box-shadow:none}
+.sidebar-scroll{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 14px;opacity:1;transition:opacity .15s}
+.sidebar.collapsed .sidebar-scroll{opacity:0;pointer-events:none}
+.sidebar-toggle{width:32px;height:32px;flex-shrink:0;border:1px solid var(--border);background:#fff;color:var(--navy);cursor:pointer;font-size:.85rem;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow);border-radius:4px;padding:0}
+.sidebar-toggle:hover{border-color:var(--accent);color:var(--accent)}
+.sidebar h2{font-size:.88rem;margin-bottom:0;color:var(--navy);padding-bottom:0;flex:1;border:none}
+.section-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.section-title-row .btn-reset{margin-bottom:0;flex-shrink:0}
+.section{margin-bottom:12px}
+.accordion{display:flex;flex-direction:column;gap:8px}
+.accordion-item{border:1px solid var(--border);background:#fff}
+.accordion-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#F7F6F4;border:none;cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:.88rem;font-weight:700;color:var(--navy);text-align:left}
+.accordion-header:hover{background:#EFEEEB}
+.accordion-chevron{font-size:.7rem;color:var(--grey);transition:transform .2s}
+.accordion-item.open .accordion-chevron{transform:rotate(180deg)}
+.accordion-body{display:none;padding:10px 10px 12px;border-top:1px solid var(--border)}
+.accordion-item.open>.accordion-body{display:block}
+.theory-item{border:1px solid var(--border);margin-bottom:6px;background:#fff}
+.theory-item:last-child{margin-bottom:0}
+.theory-header{width:100%;display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:#FAFAF8;border:none;cursor:pointer;font-family:'Source Sans 3',sans-serif;font-size:.78rem;font-weight:600;color:var(--navy);text-align:left}
+.theory-header:hover{background:#F0EEEA}
+.theory-header.active{color:var(--accent)}
+.theory-chevron{font-size:.65rem;color:var(--grey);transition:transform .2s}
+.theory-item.open .theory-chevron{transform:rotate(180deg)}
+.theory-body{display:none;padding:10px;font-size:.76rem;line-height:1.5;max-height:280px;overflow-y:auto}
+.theory-item.open .theory-body{display:block}
+.theory-body h3{font-size:.82rem;margin-bottom:6px;font-family:'Libre Baskerville',serif}
+.theory-body ul{margin:4px 0 4px 16px}
+#metabolic-section .section-title-row h2,#conditions-section h2{border-bottom:2px solid var(--accent);padding-bottom:4px;margin-bottom:8px}
+.sub-section{margin-bottom:10px;border:1px solid var(--border)}
+.sub-header{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#F7F6F4;cursor:pointer;font-weight:600;font-size:.82rem;user-select:none;gap:8px}
+.sub-header-title{flex:1}
+.sub-header-actions{display:flex;align-items:center;gap:6px}
+.btn-reset{font-size:.68rem;padding:2px 8px;border:1px solid var(--border);background:#fff;color:var(--grey);cursor:pointer;font-weight:600;font-family:'Source Sans 3',sans-serif;line-height:1.4}
+.btn-reset:hover{border-color:var(--accent);color:var(--accent)}
+.section-reset-row{display:flex;justify-content:flex-end;margin-bottom:8px}
+.sub-header:hover{background:#EFEEEB}
+.sub-body{padding:8px 10px;display:none}
+.sub-body.open{display:block}
+.param{margin-bottom:10px}
+.param-label{display:flex;justify-content:space-between;font-size:.78rem;font-weight:600;margin-bottom:3px}
+.param-label.warn{color:var(--amber)}
+.param-label.crit{color:var(--crit)}
+.param-value{font-weight:400;color:var(--grey)}
+.metabolic-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid #F0EEEA}
+.metabolic-info{flex:1;min-width:0}
+.metabolic-name{font-size:.78rem;font-weight:600;display:block}
+.metabolic-normal{font-size:.68rem;color:var(--grey);margin-top:1px}
+.metabolic-normal span{color:var(--navy);font-weight:600}
+.metabolic-stepper{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.step-btn{width:28px;height:28px;border:1px solid var(--border);background:#fff;color:var(--navy);font-size:1rem;line-height:1;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0}
+.step-btn:hover{border-color:var(--accent);color:var(--accent)}
+.step-reset{font-size:.85rem;font-weight:400}
+.metabolic-val{min-width:52px;text-align:center;font-size:.82rem;font-weight:600;font-variant-numeric:tabular-nums}
+.metabolic-val.abnormal{color:var(--amber)}
+.metabolic-val.critical{color:var(--crit)}
+.metabolic-unit{font-size:.65rem;color:var(--grey);text-align:center}
+.btn{display:inline-block;padding:6px 14px;font-size:.78rem;font-family:'Source Sans 3',sans-serif;border:1px solid var(--border);background:#fff;color:var(--navy);cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#A93226}
+.btn-block{width:100%;text-align:center;margin-bottom:10px}
+select{font-family:'Source Sans 3',sans-serif;font-size:.78rem;padding:4px 6px;border:1px solid var(--border);width:100%;margin-top:4px}
+.condition-group{margin-bottom:6px;border:1px solid var(--border)}
+.condition-group-title{padding:6px 10px;background:#F7F6F4;font-size:.78rem;font-weight:700;cursor:pointer;display:flex;justify-content:space-between}
+.condition-list{display:none;padding:4px}
+.condition-list.open{display:block}
+.condition-item{padding:5px 10px;font-size:.76rem;cursor:pointer;border-left:3px solid transparent}
+.condition-item:hover{background:#F7F6F4}
+.condition-item.active{background:#FDEDEC;border-left-color:var(--accent);font-weight:600}
+.condition-item.modified::after{content:' *';color:var(--amber);font-weight:400}
+.content{flex:1;min-height:0;min-width:0;overflow:hidden;display:flex;flex-direction:column;padding:0}
+.ecg-main{display:flex;flex-direction:column;flex:1;min-height:0;gap:6px;width:100%;padding:8px 10px 10px}
+.calibration-bar{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:var(--grey);flex-shrink:0;padding:0 2px;gap:10px}
+.calibration-bar-left{display:flex;align-items:center;gap:10px;min-width:0}
+.calibration-bar-left span{white-space:nowrap}
+.calibration-bar .tools{display:flex;gap:8px}
+.ecg-grid{display:grid;grid-template-columns:repeat(var(--ecg-cols),minmax(0,1fr));grid-template-rows:repeat(var(--ecg-rows),minmax(0,1fr));gap:6px;width:100%;flex:1;min-height:0}
+.lead-cell{position:relative;border:1px solid #D4A0A0;background:var(--paper);overflow:hidden;cursor:pointer;height:100%;min-height:0;width:100%;transition:box-shadow .15s,border-color .15s}
+.lead-cell:hover{border-color:var(--accent);box-shadow:0 0 0 1px rgba(192,57,43,.25)}
+.lead-cell canvas{display:block;width:100%;height:100%;pointer-events:none}
+.lead-label{position:absolute;top:3px;left:6px;font-size:.72rem;font-weight:700;font-family:'Libre Baskerville',serif;color:var(--navy);z-index:2;pointer-events:none}
+.rhythm-section{flex:0 0 18%;min-height:56px;max-height:140px;width:100%;position:relative;border:1px solid #D4A0A0;background:var(--paper);overflow:hidden;cursor:pointer}
+.rhythm-section canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
+.rhythm-label{position:absolute;top:3px;left:6px;font-size:.72rem;font-weight:700;font-family:'Libre Baskerville',serif;color:var(--navy);z-index:2;pointer-events:none}
+.rhythm-beam{position:absolute;top:0;right:0;width:2px;height:100%;background:var(--accent);opacity:.6;z-index:2;pointer-events:none}
+.overlay{position:fixed;inset:0;background:rgba(44,62,80,.5);z-index:100;display:none;align-items:center;justify-content:center}
+.overlay.open{display:flex}
+.overlay-box{background:#fff;border:1px solid var(--border);padding:20px 24px;width:min(960px,94vw);max-height:92vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.overlay-box h3{font-size:1.1rem;margin-bottom:4px;padding-right:28px}
+.overlay-sub{font-size:.75rem;color:var(--grey);margin-bottom:12px}
+.overlay-close{position:absolute;top:16px;right:20px;cursor:pointer;font-size:1.4rem;color:var(--grey);border:none;background:none;line-height:1}
+.overlay-box{position:relative}
+.magnify-wrap{width:100%;position:relative;background:var(--paper);border:1px solid #D4A0A0;aspect-ratio:2/1;max-height:min(52vh,520px);min-height:280px}
+.magnify-canvas{width:100%;height:100%;display:block;background:var(--paper)}
+.modal-beam{position:absolute;top:0;right:0;width:2px;height:100%;background:var(--accent);opacity:.6;pointer-events:none;display:none}
+.modal-beam.visible{display:block}
+.measure-labels{font-size:.78rem;color:var(--navy)}
+.extra-control{margin:8px 0;padding:6px;background:#F7F6F4;font-size:.76rem}
+.current-condition{font-size:.76rem;color:var(--grey);margin-bottom:10px;padding:8px;background:#F7F6F4;border:1px solid var(--border)}
+.current-condition strong{color:var(--navy);display:block;font-size:.82rem;margin-bottom:2px}
+.treatment-urgency{display:inline-block;font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:3px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
+.treatment-urgency.emergent{background:#FDEDEC;color:var(--crit)}
+.treatment-urgency.urgent{background:#FEF5E7;color:var(--amber)}
+.treatment-urgency.routine{background:#EBF5FB;color:#2874A6}
+.treatment-urgency.supportive{background:#F4F6F6;color:var(--grey)}
+.treatment-body{font-size:.76rem;line-height:1.55}
+.treatment-steps{margin:8px 0 0 18px}
+.treatment-steps li{margin-bottom:6px}
+.treatment-note{font-size:.72rem;color:var(--grey);margin-top:10px;padding-top:8px;border-top:1px solid #F0EEEA}
+.labs-hint{font-size:.72rem;color:var(--grey);margin-bottom:10px;line-height:1.45}
+.sidebar-backdrop{display:none}
+.ecg-scroll-hint{display:none;font-size:.68rem;color:var(--grey);text-align:center;padding:2px 0 4px}
+@media (max-width:900px){
+  :root{--ecg-cols:3;--ecg-rows:4;--ecg-cell-aspect:2.25;--ecg-cell-min-h:68px;--rhythm-h:72px}
+  header{padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top))}
+  header h1{font-size:1.08rem}
+  header p{font-size:.74rem;line-height:1.35}
+  .main{position:relative}
+  .sidebar{
+    position:fixed;top:var(--header-h,52px);left:0;bottom:0;
+    width:var(--sidebar-overlay-w);min-width:0;max-width:var(--sidebar-overlay-w);
+    transform:translateX(-105%);
+    transition:transform .24s ease,box-shadow .24s ease;
+    z-index:60;border-right:1px solid var(--border);
+    padding-top:env(safe-area-inset-top);
+  }
+  .sidebar.open{transform:translateX(0);box-shadow:4px 0 28px rgba(44,62,80,.18)}
+  .sidebar.collapsed{width:var(--sidebar-overlay-w);min-width:0;transform:translateX(-105%)}
+  .sidebar.collapsed .sidebar-scroll{opacity:1;pointer-events:auto}
+  .sidebar-scroll{padding:12px 12px max(12px,env(safe-area-inset-bottom))}
+  .sidebar-backdrop{
+    display:block;position:fixed;top:var(--header-h,52px);left:0;right:0;bottom:0;background:rgba(44,62,80,.42);
+    z-index:55;opacity:0;pointer-events:none;transition:opacity .22s ease;
+  }
+  .sidebar-backdrop.visible{opacity:1;pointer-events:auto}
+  .content{width:100%;flex:1;min-width:0}
+  .ecg-main{padding:6px 8px max(8px,env(safe-area-inset-bottom));overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  .content{overflow-x:hidden}
+  .ecg-grid{
+    flex:0 0 auto;
+    grid-template-columns:repeat(var(--ecg-cols),minmax(0,1fr));
+    grid-template-rows:repeat(var(--ecg-rows),auto);
+    gap:5px;
+    min-height:0;
+  }
+  .lead-cell{
+    height:auto;
+    aspect-ratio:var(--ecg-cell-aspect)/1;
+    min-height:var(--ecg-cell-min-h);
+  }
+  .lead-label{font-size:.66rem;top:2px;left:4px}
+  .rhythm-section{flex:0 0 var(--rhythm-h);min-height:var(--rhythm-h);height:var(--rhythm-h);max-height:var(--rhythm-h)}
+  .calibration-bar{gap:6px}
+  .calibration-bar-left span{font-size:.68rem}
+  .ecg-scroll-hint{display:block}
+  .overlay-box{padding:16px 14px;width:min(960px,96vw);max-height:94vh}
+  .magnify-wrap{min-height:200px;max-height:min(45vh,420px)}
+  .metabolic-row{flex-wrap:wrap;gap:6px}
+  .metabolic-stepper{margin-left:auto}
+}
+@media (max-width:600px){
+  :root{--ecg-cols:2;--ecg-rows:6;--ecg-cell-aspect:2.05;--ecg-cell-min-h:76px;--rhythm-h:64px}
+  header p{display:none}
+  .ecg-grid{gap:4px}
+  .lead-label{font-size:.62rem}
+  .calibration-bar{flex-wrap:wrap}
+  .calibration-bar .tools{width:100%;justify-content:flex-end}
+  .btn{padding:5px 10px;font-size:.72rem}
+  .sidebar-toggle{width:36px;height:36px;font-size:1rem}
+  .theory-body{max-height:220px}
+  .metabolic-row{flex-direction:column;align-items:stretch}
+  .metabolic-stepper{margin-left:0;justify-content:center}
+  .section-title-row{flex-wrap:wrap;gap:6px}
+}
+@media (max-width:380px){
+  :root{--ecg-cell-aspect:1.95;--ecg-cell-min-h:70px;--rhythm-h:56px}
+  header h1{font-size:.98rem}
+}
+@media (min-width:901px) and (max-width:1100px){
+  :root{--sidebar-w:280px}
+  .ecg-grid{gap:5px}
+  header{padding:12px 18px}
+  header h1{font-size:1.2rem}
+}
+@media print{
+  .sidebar,.sidebar-toggle,.sidebar-backdrop,.ecg-scroll-hint,.tools,.overlay,.rhythm-section{display:none!important}
+  .main,.content{overflow:visible}
+  .ecg-grid{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr))}
+  .lead-cell{aspect-ratio:auto;height:100%;min-height:80px}
+  .ecg-grid,.lead-cell{break-inside:avoid}
+  body{overflow:visible;height:auto}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>ECG Educational Simulator</h1>
+    <p>Interactive 12-lead ECG for medical education — select a condition to view morphology, ECG-relevant labs, and treatment steps</p>
+  </header>
+  <div class="main">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-scroll">
+        <div class="accordion">
+          <div class="accordion-item open" id="accordion-variables">
+            <button type="button" class="accordion-header" data-accordion="variables">
+              <span>Variables</span>
+              <span class="accordion-chevron">▼</span>
+            </button>
+            <div class="accordion-body">
+              <section class="section" id="metabolic-section">
+                <div class="section-title-row">
+                  <h2>Labs & Metabolites</h2>
+                  <button type="button" class="btn-reset" id="reset-labs-btn">Reset All</button>
+                </div>
+                <div id="current-condition" class="current-condition"></div>
+                <p class="labs-hint">Only values that alter the simulated ECG are shown. Selecting a condition updates labs when clinically relevant.</p>
+                <div class="sub-section">
+                  <div class="sub-header open-header">
+                    <span class="sub-header-title">Electrolytes (ECG-relevant)</span>
+                    <span class="sub-header-actions">
+                      <button type="button" class="btn-reset" data-reset-group="electrolytes">Reset</button>
+                      <span>▼</span>
+                    </span>
+                  </div>
+                  <div class="sub-body open" id="electrolyte-controls"></div>
+                </div>
+                <div class="sub-section">
+                  <div class="sub-header open-header">
+                    <span class="sub-header-title">Metabolites (ECG-relevant)</span>
+                    <span class="sub-header-actions">
+                      <button type="button" class="btn-reset" data-reset-group="metabolites">Reset</button>
+                      <span>▼</span>
+                    </span>
+                  </div>
+                  <div class="sub-body open" id="metabolite-controls"></div>
+                </div>
+              </section>
+              <section class="section" id="conditions-section">
+                <h2>Pathological Conditions</h2>
+                <div id="condition-groups"></div>
+              </section>
+            </div>
+          </div>
+          <div class="accordion-item" id="accordion-theory">
+            <button type="button" class="accordion-header" data-accordion="theory">
+              <span>Theory</span>
+              <span class="accordion-chevron">▼</span>
+            </button>
+            <div class="accordion-body">
+              <div id="theory-sections">
+                <div class="theory-item open" data-theory="overview">
+                  <button type="button" class="theory-header active">Overview <span class="theory-chevron">▼</span></button>
+                  <div class="theory-body open" id="theory-overview"></div>
+                </div>
+                <div class="theory-item" data-theory="findings">
+                  <button type="button" class="theory-header">ECG Findings <span class="theory-chevron">▼</span></button>
+                  <div class="theory-body" id="theory-findings"></div>
+                </div>
+                <div class="theory-item" data-theory="pathophysiology">
+                  <button type="button" class="theory-header">Pathophysiology <span class="theory-chevron">▼</span></button>
+                  <div class="theory-body" id="theory-pathophysiology"></div>
+                </div>
+                <div class="theory-item" data-theory="criteria">
+                  <button type="button" class="theory-header">Diagnostic Criteria & Pearls <span class="theory-chevron">▼</span></button>
+                  <div class="theory-body" id="theory-criteria"></div>
+                </div>
+                <div class="theory-item" data-theory="treatment">
+                  <button type="button" class="theory-header">Treatment Modality <span class="theory-chevron">▼</span></button>
+                  <div class="theory-body" id="theory-treatment">
+                    <div id="treatment-condition" class="current-condition"></div>
+                    <div id="treatment-content" class="treatment-body"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
+    <div class="content">
+      <div class="ecg-main">
+        <div class="calibration-bar">
+          <div class="calibration-bar-left">
+            <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">◀</button>
+            <span>25 mm/sec &nbsp;|&nbsp; 10 mm/mV</span>
+          </div>
+          <div class="tools">
+            <button class="btn" id="print-btn">Print ECG</button>
+          </div>
+        </div>
+        <p class="ecg-scroll-hint">Scroll for rhythm strip · Tap a lead to enlarge</p>
+        <div class="ecg-grid" id="ecg-grid"></div>
+        <div class="rhythm-section" id="rhythm-section" title="Click to enlarge">
+          <span class="rhythm-label">Lead II — Rhythm Strip</span>
+          <canvas id="rhythm-canvas"></canvas>
+          <div class="rhythm-beam"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="overlay">
+  <div class="overlay-box">
+    <button class="overlay-close" id="overlay-close">&times;</button>
+    <h3 id="overlay-title">Lead Detail</h3>
+    <p class="overlay-sub" id="overlay-sub"></p>
+    <div class="magnify-wrap">
+      <canvas class="magnify-canvas" id="magnify-canvas"></canvas>
+      <div class="modal-beam" id="modal-beam"></div>
+    </div>
+    <div class="measure-labels" id="measure-labels"></div>
+  </div>
+</div>
+<script>
+/* ============================================================
+   SECTION: Constants & Normal Parameters
+   ============================================================ */
+const PX_PER_MM = 3;
+const PAPER_SPEED = 25;
+const RHYTHM_SCROLL_FACTOR = 0.4; // rhythm strip scroll speed (1 = real-time paper speed)
+const GAIN = 10;
+const DISPLAY_SEC = 2.5;
+const VISUAL_SCALE = 1;
+const MODAL_MAGNIFY = 2;
+const TRACE_LINE_WIDTH = 0.75;   // static 12-lead trace (CSS px)
+const RHYTHM_LINE_WIDTH = 0.83;  // rhythm strip slightly bolder for visibility
+const TRACE_MIN_LINE_WIDTH = 0.53;
+const TRACE_CONDENSE_COL_PX = 0.85; // bucket to ~1 screen px to avoid overdraw at fast rates
+const TRACE_COLOR = '#000';
+const TRACE_PAD_MV = 0.28;       // symmetric mV padding above/below waveform
+const CALIBRATION_MV = 1.0;    // standard 1 mV calibration pulse height
+const TRACE_OVERSHOOT_PX = 4;  // headroom for curve smoothing at peaks
+
+function getContentScale() {
+  const w = window.innerWidth;
+  if (w <= 380) return 1.55;
+  if (w <= 600) return 1.75;
+  if (w <= 900) return 2.0;
+  return 2.5;
+}
+
+function pxPerMm() { return PX_PER_MM * VISUAL_SCALE; }
+function msToPxScale() { return (PAPER_SPEED * pxPerMm()) / 1000; }
+function mvToPxScale() { return GAIN * pxPerMm(); }
+function renderPxPerMm() { return pxPerMm() * getContentScale(); }
+function renderMsToPxScale() { return msToPxScale() * getContentScale(); }
+function renderMvToPxScale() { return mvToPxScale() * getContentScale(); }
+function displaySecForWidth(w) { return Math.min(DISPLAY_SEC, w / renderMsToPxScale() / 1000); }
+
+function getModalRenderScale() {
+  return {
+    pxPerMm: renderPxPerMm() * MODAL_MAGNIFY,
+    msToPx: renderMsToPxScale() * MODAL_MAGNIFY,
+    mvToPx: renderMvToPxScale() * MODAL_MAGNIFY
+  };
+}
+
+function buildYMapperFromExtents(peak, trough, h, mvToPx) {
+  if (!isFinite(peak)) peak = 1;
+  if (!isFinite(trough)) trough = -0.3;
+
+  const topMv = Math.max(peak, CALIBRATION_MV) + TRACE_PAD_MV;
+  const bottomMv = Math.max(-trough, 0) + TRACE_PAD_MV;
+  const totalSpanMv = Math.max(topMv + bottomMv, 0.5);
+
+  const pxMargin = Math.max(10, Math.min(20, h * 0.12));
+  const availH = Math.max(1, h - pxMargin * 2);
+
+  let scale = mvToPx;
+  const fullSpanPx = totalSpanMv * scale;
+  if (fullSpanPx > availH - TRACE_OVERSHOOT_PX) {
+    scale = (availH - TRACE_OVERSHOOT_PX) / totalSpanMv;
+  }
+
+  const usedH = totalSpanMv * scale;
+  const extraPx = Math.max(0, availH - usedH);
+  const topPx = pxMargin + extraPx / 2;
+  const baselineY = topPx + topMv * scale;
+  return mv => baselineY - mv * scale;
+}
+
+function buildYMapper(points, h, mvToPx) {
+  let peak = -Infinity, trough = Infinity;
+  for (const p of points) {
+    if (p.y > peak) peak = p.y;
+    if (p.y < trough) trough = p.y;
+  }
+  return buildYMapperFromExtents(peak, trough, h, mvToPx);
+}
+
+function computeGlobalExtents(params, condition) {
+  let peak = -Infinity, trough = Infinity;
+  const sampleCanvas = state.leadCanvases?.II || state.leadCanvases?.V5;
+  const w = sampleCanvas?.parentElement?.getBoundingClientRect().width || 200;
+  const dur = displaySecForWidth(w) * 1000;
+  for (const lead of LEAD_ORDER) {
+    const pts = buildRhythm(params, lead, dur, condition);
+    for (const p of pts) {
+      if (p.y > peak) peak = p.y;
+      if (p.y < trough) trough = p.y;
+    }
+  }
+  return { peak, trough };
+}
+
+const MQ_MOBILE = window.matchMedia('(max-width: 900px)');
+
+function isMobileLayout() {
+  return MQ_MOBILE.matches;
+}
+
+function syncSidebarUI() {
+  const sidebar = document.getElementById('sidebar');
+  const backdrop = document.getElementById('sidebar-backdrop');
+  const toggle = document.getElementById('sidebar-toggle');
+  if (!sidebar || !toggle) return;
+
+  if (isMobileLayout()) {
+    const open = sidebar.classList.contains('open');
+    toggle.textContent = open ? '✕' : '☰';
+    toggle.setAttribute('aria-label', open ? 'Close variables panel' : 'Open variables panel');
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (backdrop) {
+      backdrop.classList.toggle('visible', open);
+      backdrop.setAttribute('aria-hidden', open ? 'false' : 'true');
+    }
+    document.body.style.overflow = open ? 'hidden' : '';
+  } else {
+    sidebar.classList.remove('open');
+    if (backdrop) {
+      backdrop.classList.remove('visible');
+      backdrop.setAttribute('aria-hidden', 'true');
+    }
+    document.body.style.overflow = '';
+    const collapsed = sidebar.classList.contains('collapsed');
+    toggle.textContent = collapsed ? '▶' : '◀';
+    toggle.setAttribute('aria-label', 'Toggle sidebar');
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+  }
+}
+
+function closeMobileSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar || !isMobileLayout()) return;
+  sidebar.classList.remove('open');
+  syncSidebarUI();
+  setTimeout(scheduleRedraw, 120);
+}
+
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+  if (isMobileLayout()) {
+    sidebar.classList.toggle('open');
+  } else {
+    sidebar.classList.toggle('collapsed');
+  }
+  syncSidebarUI();
+  setTimeout(scheduleRedraw, 230);
+}
+
+function initSidebarLayout() {
+  const sidebar = document.getElementById('sidebar');
+  if (!sidebar) return;
+  if (isMobileLayout()) {
+    sidebar.classList.remove('collapsed');
+    sidebar.classList.remove('open');
+  } else {
+    sidebar.classList.remove('open');
+  }
+  syncSidebarUI();
+}
+
+function syncHeaderOffset() {
+  const header = document.querySelector('header');
+  if (header) {
+    document.documentElement.style.setProperty('--header-h', header.offsetHeight + 'px');
+  }
+}
+
+function updateLayoutVars() {
+  syncHeaderOffset();
+  syncSidebarUI();
+  scheduleRedraw();
+}
+
+function initSidebar() {
+  initSidebarLayout();
+  MQ_MOBILE.addEventListener('change', () => {
+    initSidebarLayout();
+    scheduleRedraw();
+  });
+
+  document.getElementById('sidebar-toggle').onclick = toggleSidebar;
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (backdrop) backdrop.onclick = closeMobileSidebar;
+
+  document.querySelectorAll('.accordion-header').forEach(btn => {
+    btn.onclick = () => btn.closest('.accordion-item').classList.toggle('open');
+  });
+
+  document.querySelectorAll('.theory-item').forEach(item => {
+    const header = item.querySelector('.theory-header');
+    header.onclick = () => {
+      const willOpen = !item.classList.contains('open');
+      document.querySelectorAll('.theory-item').forEach(i => {
+        i.classList.remove('open');
+        i.querySelector('.theory-body').classList.remove('open');
+        i.querySelector('.theory-header').classList.remove('active');
+      });
+      if (willOpen) {
+        item.classList.add('open');
+        item.querySelector('.theory-body').classList.add('open');
+        header.classList.add('active');
+      }
+    };
+  });
+}
+
+const LEAD_ORDER = ['I','aVR','V1','V4','II','aVL','V2','V5','III','aVF','V3','V6'];
+const LEAD_ANGLES = { I:0, II:60, III:120, aVR:210, aVL:300, aVF:90 };
+const PRECORDIAL = { V1:{r:0.15,s:1.3,p:0.6,t:0.5}, V2:{r:0.45,s:1.0,p:0.7,t:0.6}, V3:{r:0.85,s:0.55,p:0.85,t:0.75},
+  V4:{r:1.25,s:0.25,p:1.0,t:0.9}, V5:{r:1.5,s:0.15,p:1.1,t:1.0}, V6:{r:1.4,s:0.12,p:1.05,t:0.95} };
+
+const NORMAL = {
+  heartRate:75, prInterval:160, qrsDuration:80, qtInterval:400,
+  pWaveAmplitude:0.12, pWaveDuration:90, rWaveAmplitude:1.0, sWaveDepth:0.18,
+  tWaveAmplitude:0.32, tWaveSymmetry:0.42, stDeviation:0, stShape:'normal',
+  qrsAxis:60, deltaWave:0, uWave:0, pWaveMorphology:'normal',
+  fibrillatory:0, flutterWaves:0, jWave:0, brugadaType:0
+};
+
+const LAB_NORMALS = {
+  potassium: 4.0, sodium: 140, calcium: 9.5, magnesium: 2.0,
+  glucose: 90, bun: 14, creatinine: 1.0, ph: 7.40
+};
+
+const ELECTROLYTES = [
+  { key:'potassium', label:'Potassium (K⁺)', unit:'mEq/L', normal:4.0, min:2.0, max:8.0, step:0.1, decimals:1 },
+  { key:'calcium', label:'Calcium (Ca²⁺)', unit:'mg/dL', normal:9.5, min:6.0, max:14.0, step:0.1, decimals:1 },
+  { key:'magnesium', label:'Magnesium (Mg²⁺)', unit:'mg/dL', normal:2.0, min:0.5, max:4.0, step:0.1, decimals:1 }
+];
+
+const METABOLITES = [
+  { key:'glucose', label:'Glucose', unit:'mg/dL', normal:90, min:40, max:600, step:5, decimals:0 },
+  { key:'creatinine', label:'Creatinine', unit:'mg/dL', normal:1.0, min:0.3, max:10, step:0.1, decimals:1 },
+  { key:'ph', label:'Blood pH', unit:'', normal:7.40, min:7.0, max:7.6, step:0.01, decimals:2 }
+];
+
+const ECG_LAB_DEFS = [...ELECTROLYTES, ...METABOLITES];
+
+const CONDITION_LAB_PROFILES = {
+  'hyperkalemia': { potassium: 6.5 },
+  'hypokalemia': { potassium: 2.7 },
+  'hypercalcemia': { calcium: 11.8 },
+  'hypocalcemia': { calcium: 7.2 },
+  'hypomagnesemia': { magnesium: 1.1, potassium: 3.1 },
+  'digoxin': { potassium: 5.6 },
+  'bb-overdose': { glucose: 65 },
+  'cocaine': { glucose: 110 },
+  'tca': { ph: 7.28 },
+  'hypothermia': { ph: 7.32 }
+};
+
+function defaultMetabolicLevels() {
+  return { ...LAB_NORMALS };
+}
+
+function applyMetabolicLevels(base, levels) {
+  const p = { ...base };
+  const k = levels.potassium, ca = levels.calcium, mg = levels.magnesium;
+  const ph = levels.ph, cr = levels.creatinine, glu = levels.glucose;
+
+  if (k > 5.0) {
+    const sev = Math.min(1, (k - 5.0) / 3.0);
+    p.tWaveAmplitude = Math.min(1.0, p.tWaveAmplitude + sev * 0.45);
+    p.tWaveSymmetry = Math.min(0.95, p.tWaveSymmetry + sev * 0.35);
+    p.qtInterval = Math.max(200, p.qtInterval - sev * 80);
+    p.prInterval = Math.min(400, p.prInterval + sev * 100);
+    if (k > 6.0) {
+      const s2 = Math.min(1, (k - 6.0) / 2.0);
+      p.qrsDuration = Math.min(200, p.qrsDuration + s2 * 50);
+      p.pWaveAmplitude = Math.max(0, p.pWaveAmplitude * (1 - s2 * 0.85));
+    }
+    if (k > 7.0) {
+      p.pWaveMorphology = 'absent';
+      p.qrsDuration = Math.min(200, Math.max(p.qrsDuration, 120 + (k - 7) * 40));
+      p.heartRate = Math.max(30, p.heartRate - (k - 7) * 8);
+    }
+  } else if (k < 3.5) {
+    const sev = Math.min(1, (3.5 - k) / 1.5);
+    p.tWaveAmplitude = p.tWaveAmplitude * (1 - sev * 0.65);
+    p.uWave = Math.max(p.uWave, sev * 0.28);
+    p.qtInterval = Math.min(600, p.qtInterval + sev * 100);
+    p.stDeviation = p.stDeviation - sev * 0.1;
+  }
+
+  if (ca > 10.5) p.qtInterval = Math.max(200, p.qtInterval - (ca - 10.5) * 28);
+  else if (ca < 8.5) p.qtInterval = Math.min(600, p.qtInterval + (8.5 - ca) * 35);
+
+  if (mg < 1.7) {
+    const sev = Math.min(1, (1.7 - mg) / 1.2);
+    p.qtInterval = Math.min(600, p.qtInterval + sev * 75);
+    p.uWave = Math.max(p.uWave, sev * 0.18);
+    p.tWaveAmplitude = p.tWaveAmplitude * (1 - sev * 0.15);
+  }
+
+  if (ph < 7.35) {
+    const acid = Math.min(1, (7.35 - ph) / 0.35);
+    p.tWaveAmplitude = Math.min(1.0, p.tWaveAmplitude + acid * 0.15);
+    p.qrsDuration = Math.min(200, p.qrsDuration + acid * 15);
+  } else if (ph > 7.45) {
+    p.qtInterval = Math.min(600, p.qtInterval + (ph - 7.45) * 120);
+  }
+
+  if (cr > 2.0) {
+    p.prInterval = Math.min(400, p.prInterval + (cr - 2) * 25);
+    p.pWaveAmplitude = Math.max(0, p.pWaveAmplitude - (cr - 2) * 0.03);
+  }
+
+  if (glu > 250) p.heartRate = Math.min(200, p.heartRate + (glu - 250) * 0.04);
+
+  return p;
+}
+
+function labsAreNormal(levels) {
+  return ECG_LAB_DEFS.every(def =>
+    Math.abs(levels[def.key] - def.normal) < def.step * 0.51
+  );
+}
+
+function labsForCondition(id) {
+  const levels = defaultMetabolicLevels();
+  const profile = CONDITION_LAB_PROFILES[id];
+  if (profile) Object.assign(levels, profile);
+  return levels;
+}
+
+function applyConditionLabs(id) {
+  state.metabolicLevels = labsForCondition(id);
+  state.conditionModified = !labsAreNormal(state.metabolicLevels);
+  updateLabUI();
+}
+
+/* ============================================================
+   SECTION: Condition Presets
+   ============================================================ */
+const CONDITION_CATEGORIES = {
+  cardiac: 'Cardiac Conditions',
+  metabolic: 'Metabolic / Electrolyte',
+  drug: 'Drug Effects',
+  congenital: 'Congenital / Structural'
+};
+
+function preset(id, name, cat, params, leadOverrides={}, extras={}) {
+  return { id, name, category: cat, params: {...NORMAL, ...params}, leadOverrides, extras };
+}
+
+const CONDITIONS = [
+  preset('normal','Normal Sinus Rhythm','cardiac',{},
+    { V1:{pWaveMorphology:'biphasic',pWaveAmplitude:0.14}, II:{rWaveAmplitude:1.15,tWaveAmplitude:0.35} }),
+  preset('sinus-tach','Sinus Tachycardia','cardiac',{ heartRate:120 }),
+  preset('sinus-brady','Sinus Bradycardia','cardiac',{ heartRate:45 }),
+  preset('avb1','1st Degree AV Block','cardiac',{ prInterval:240 }),
+  preset('avb2-wenckebach','2nd Degree AV Block (Mobitz I)','cardiac',{ prInterval:200, heartRate:65 }, {}, { wenckebach:true }),
+  preset('avb2-mobitz2','2nd Degree AV Block (Mobitz II)','cardiac',{ prInterval:180, heartRate:55, qrsDuration:100 }, {}, { mobitz2:true }),
+  preset('avb3','Complete (3rd Degree) AV Block','cardiac',{ heartRate:40, prInterval:300, qrsDuration:120, qrsAxis:-30 }, {}, { avDissociation:true }),
+  preset('lbbb','Left Bundle Branch Block','cardiac',{ qrsDuration:140, qrsAxis:-30, rWaveAmplitude:1.4 },
+    { V1:{rWaveAmplitude:0.1,sWaveDepth:1.4,stDeviation:-0.1,tWaveAmplitude:-0.25,morph:'qs'},
+      V2:{rWaveAmplitude:0.2,sWaveDepth:1.2}, V5:{rWaveAmplitude:2.0,sWaveDepth:0,stDeviation:-0.15,tWaveAmplitude:-0.35,morph:'monophasicR'},
+      V6:{rWaveAmplitude:1.9,sWaveDepth:0,stDeviation:-0.15,tWaveAmplitude:-0.3}, I:{sWaveDepth:0.05}, aVL:{rWaveAmplitude:1.3} }),
+  preset('rbbb','Right Bundle Branch Block','cardiac',{ qrsDuration:140, qrsAxis:90 },
+    { V1:{rWaveAmplitude:1.2,sWaveDepth:0.3,morph:'rsr'}, V2:{rWaveAmplitude:1.0,morph:'rsr'},
+      I:{sWaveDepth:0.5}, V5:{sWaveDepth:0.45}, V6:{sWaveDepth:0.4} }),
+  preset('lafb','Left Anterior Fascicular Block','cardiac',{ qrsAxis:-45, qrsDuration:90 },
+    { I:{rWaveAmplitude:0.6}, II:{rWaveAmplitude:0.4}, III:{rWaveAmplitude:0.15,sWaveDepth:0.5}, aVF:{sWaveDepth:0.6} }),
+  preset('af','Atrial Fibrillation','cardiac',{ heartRate:110, pWaveAmplitude:0, pWaveMorphology:'absent', fibrillatory:1.2, rWaveAmplitude:0.85 }, {}, { irregular:true }),
+  preset('aflutter','Atrial Flutter','cardiac',{ heartRate:150, pWaveAmplitude:0, pWaveMorphology:'absent', flutterWaves:1, prInterval:200 },
+    { II:{flutterAmp:0.14}, III:{flutterAmp:0.12}, aVF:{flutterAmp:0.13}, I:{flutterAmp:0.04}, V1:{flutterAmp:0.03} }, { avRatio:2 }),
+  preset('vtach','Ventricular Tachycardia','cardiac',{ heartRate:180, qrsDuration:160, prInterval:0, pWaveAmplitude:0, qrsAxis:180, rWaveAmplitude:1.1, sWaveDepth:0.35 },
+    { V1:{morph:'vt',rWaveAmplitude:1.4}, V6:{morph:'vt',rWaveAmplitude:-0.9} }, { avDissociation:true }),
+  preset('lvh','Left Ventricular Hypertrophy','cardiac',{ rWaveAmplitude:1.8, qrsDuration:95, qrsAxis:0, tWaveAmplitude:0.45 },
+    { V5:{rWaveAmplitude:2.6}, V6:{rWaveAmplitude:2.4}, I:{rWaveAmplitude:1.5}, aVL:{rWaveAmplitude:1.6}, V1:{sWaveDepth:1.5} }),
+  preset('rvh','Right Ventricular Hypertrophy','cardiac',{ qrsAxis:110, rWaveAmplitude:1.1, qrsDuration:95, pWaveAmplitude:0.22 },
+    { V1:{rWaveAmplitude:1.3,sWaveDepth:0.2}, V2:{rWaveAmplitude:1.0}, V5:{sWaveDepth:0.5},
+      II:{rWaveAmplitude:1.2,pWaveAmplitude:0.28}, aVF:{rWaveAmplitude:1.3,pWaveAmplitude:0.26} }),
+  preset('stemi-anterior','Anterior STEMI (V1–V4)','cardiac',{ heartRate:95, tWaveAmplitude:0.5, tWaveSymmetry:0.35, stShape:'tombstone' },
+    { V1:{stDeviation:0.34,stShape:'tombstone',tWaveAmplitude:0.55,sWaveDepth:0.08}, V2:{stDeviation:0.4,stShape:'tombstone',tWaveAmplitude:0.62,sWaveDepth:0.06},
+      V3:{stDeviation:0.38,stShape:'tombstone',tWaveAmplitude:0.58,sWaveDepth:0.05}, V4:{stDeviation:0.32,stShape:'tombstone',tWaveAmplitude:0.52},
+      II:{stDeviation:-0.16,stShape:'horizontal'}, III:{stDeviation:-0.14,stShape:'horizontal'}, aVF:{stDeviation:-0.14,stShape:'horizontal'} }),
+  preset('stemi-inferior','Inferior STEMI (II, III, aVF)','cardiac',{ heartRate:90, stShape:'tombstone' },
+    { II:{stDeviation:0.30,stShape:'tombstone',tWaveAmplitude:0.40,sWaveDepth:0,rWaveAmplitude:1.1},
+      III:{stDeviation:0.45,stShape:'tombstone',tWaveAmplitude:0.42,sWaveDepth:0,rWaveAmplitude:1.25},
+      aVF:{stDeviation:0.34,stShape:'tombstone',tWaveAmplitude:0.38,sWaveDepth:0,rWaveAmplitude:1.15},
+      I:{stDeviation:-0.16,stShape:'horizontal',tWaveAmplitude:0.15,sWaveDepth:0.35}, aVL:{stDeviation:-0.24,stShape:'horizontal',tWaveAmplitude:0.12,sWaveDepth:0.3},
+      V1:{stDeviation:-0.14,stShape:'horizontal',sWaveDepth:1.1}, V2:{stDeviation:-0.18,stShape:'horizontal',sWaveDepth:1.0}, V3:{stDeviation:-0.10,stShape:'horizontal'} }),
+  preset('stemi-lateral','Lateral STEMI (I, aVL, V5–V6)','cardiac',{ heartRate:92, stShape:'tombstone' },
+    { I:{stDeviation:0.32,stShape:'tombstone',tWaveAmplitude:0.48}, aVL:{stDeviation:0.35,stShape:'tombstone',tWaveAmplitude:0.5},
+      V5:{stDeviation:0.34,stShape:'tombstone',tWaveAmplitude:0.55}, V6:{stDeviation:0.3,stShape:'tombstone',tWaveAmplitude:0.48},
+      III:{stDeviation:-0.14,stShape:'horizontal'}, aVF:{stDeviation:-0.12,stShape:'horizontal'}, V2:{stDeviation:-0.1,stShape:'horizontal'} }),
+  preset('posterior-mi','Posterior MI','cardiac',{ heartRate:88, stShape:'horizontal' },
+    { V1:{stDeviation:-0.18,stShape:'horizontal',rWaveAmplitude:0.85,sWaveDepth:0.08}, V2:{stDeviation:-0.22,stShape:'horizontal',rWaveAmplitude:0.95},
+      V3:{stDeviation:-0.14,stShape:'horizontal'}, V7:{stDeviation:0.32,stShape:'tombstone'}, V8:{stDeviation:0.3,stShape:'tombstone'}, V9:{stDeviation:0.28,stShape:'tombstone'} }),
+  preset('nstemi','NSTEMI / UA','cardiac',{ heartRate:85, stShape:'downsloping', stDeviation:-0.1 },
+    { V4:{stDeviation:-0.18,stShape:'downsloping'}, V5:{stDeviation:-0.2,stShape:'downsloping'}, V6:{stDeviation:-0.18,stShape:'downsloping'},
+      II:{stDeviation:-0.12,stShape:'downsloping'}, aVL:{stDeviation:-0.1,stShape:'downsloping'} }),
+  preset('old-anterior-mi','Old Anterior MI','cardiac',{ qrsDuration:90 },
+    { V1:{rWaveAmplitude:0.05,sWaveDepth:0.8,qWaveDepth:0.4}, V2:{qWaveDepth:0.45,rWaveAmplitude:0.15}, V3:{qWaveDepth:0.35}, V4:{qWaveDepth:0.25} }),
+  preset('pericarditis','Pericarditis','cardiac',{ heartRate:95, stShape:'concave', prInterval:140 },
+    { I:{stDeviation:0.14,stShape:'concave'}, II:{stDeviation:0.12,stShape:'concave'}, III:{stDeviation:0.1,stShape:'concave'},
+      aVF:{stDeviation:0.12,stShape:'concave'}, aVL:{stDeviation:0.1,stShape:'concave'},
+      V2:{stDeviation:0.1,stShape:'saddle'}, V3:{stDeviation:0.1,stShape:'saddle'}, V4:{stDeviation:0.08,stShape:'concave'},
+      V5:{stDeviation:0.08,stShape:'concave'}, V6:{stDeviation:0.08,stShape:'concave'} }),
+  preset('hyperkalemia','Hyperkalemia','metabolic',{ heartRate:55, prInterval:220, qtInterval:320, tWaveAmplitude:0.65, tWaveSymmetry:0.88 },
+    { V2:{tWaveAmplitude:0.75,tWaveSymmetry:0.9}, V3:{tWaveAmplitude:0.72,tWaveSymmetry:0.9}, V4:{tWaveAmplitude:0.68,tWaveSymmetry:0.88} },
+    { hyperkalemiaSeverity:1 }),
+  preset('hypokalemia','Hypokalemia','metabolic',{ heartRate:85, uWave:0.22, tWaveAmplitude:0.12, qtInterval:500, stDeviation:-0.08, stShape:'downsloping' },
+    { V2:{uWave:0.28,tWaveAmplitude:0.1}, V3:{uWave:0.3,tWaveAmplitude:0.08} }),
+  preset('hypercalcemia','Hypercalcemia','metabolic',{ qtInterval:300, heartRate:75 }),
+  preset('hypocalcemia','Hypocalcemia','metabolic',{ qtInterval:520, heartRate:70 }),
+  preset('hypomagnesemia','Hypomagnesemia','metabolic',{ qtInterval:470, tWaveAmplitude:0.4, uWave:0.15, heartRate:80 }),
+  preset('hypothermia','Hypothermia','metabolic',{ heartRate:35, prInterval:240, qrsDuration:110, qtInterval:520, jWave:0.28 },
+    { II:{jWave:0.32}, V3:{jWave:0.3}, V4:{jWave:0.28}, V5:{jWave:0.26} }),
+  preset('digoxin','Digoxin Toxicity','drug',{ heartRate:48, prInterval:220, qtInterval:340, stShape:'reverse_tick', stDeviation:-0.14, tWaveAmplitude:0.18 },
+    { I:{stDeviation:-0.12}, aVL:{stDeviation:-0.14}, V5:{stDeviation:-0.15}, V6:{stDeviation:-0.14} }),
+  preset('quinidine','Quinidine','drug',{ qtInterval:520, qrsDuration:120, tWaveAmplitude:0.5, heartRate:75 }),
+  preset('tca','TCA Overdose','drug',{ qrsDuration:140, qrsAxis:120, heartRate:110, rWaveAmplitude:0.8 },
+    { aVR:{rWaveAmplitude:0.9,stDeviation:0.1} }),
+  preset('bb-overdose','Beta-blocker Overdose','drug',{ heartRate:38, prInterval:260, qrsDuration:90 }),
+  preset('cocaine','Cocaine Toxicity','drug',{ heartRate:130, stDeviation:0.12, stShape:'horizontal', qrsDuration:85, tWaveAmplitude:0.35 },
+    { II:{stDeviation:0.14,stShape:'upsloping'}, V5:{stDeviation:-0.1,stShape:'downsloping'} }),
+  preset('amiodarone','Amiodarone','drug',{ qtInterval:500, uWave:0.12, heartRate:58, tWaveAmplitude:0.2 }),
+  preset('wpw','Wolff-Parkinson-White (WPW)','congenital',{ prInterval:100, qrsDuration:110, deltaWave:1.0, heartRate:85 },
+    { V1:{deltaWave:0.6}, V2:{deltaWave:0.5}, II:{deltaWave:1.1,rWaveAmplitude:1.15} }),
+  preset('brugada1','Brugada Syndrome (Type 1)','congenital',{ heartRate:70, stShape:'coved' },
+    { V1:{stDeviation:0.25,tWaveAmplitude:-0.3,stShape:'coved'}, V2:{stDeviation:0.22,tWaveAmplitude:-0.25,stShape:'coved'} }),
+  preset('brugada2','Brugada Syndrome (Type 2)','congenital',{ heartRate:72, stShape:'saddle' },
+    { V1:{stDeviation:0.15,stShape:'saddle'}, V2:{stDeviation:0.12,stShape:'saddle'} }),
+  preset('brugada3','Brugada Syndrome (Type 3)','congenital',{ heartRate:74 },
+    { V1:{stDeviation:0.08}, V2:{stDeviation:0.06} }),
+  preset('long-qt','Long QT Syndrome','congenital',{ qtInterval:560, qrsDuration:90, tWaveAmplitude:0.45, heartRate:65 }),
+  preset('short-qt','Short QT Syndrome','congenital',{ qtInterval:280, tWaveAmplitude:0.5, tWaveSymmetry:0.7, heartRate:80 }),
+  preset('hcm','Hypertrophic Cardiomyopathy','congenital',{ qrsDuration:100, rWaveAmplitude:1.6, tWaveAmplitude:0.5, qrsAxis:0 },
+    { V1:{sWaveDepth:1.2}, V5:{rWaveAmplitude:2.2}, V6:{rWaveAmplitude:2.0,stDeviation:-0.12}, I:{rWaveAmplitude:1.4}, aVL:{rWaveAmplitude:1.5} }),
+  preset('arvd','Arrhythmogenic Right Ventricular Dysplasia','congenital',{ qrsAxis:100, heartRate:88 },
+    { V1:{stDeviation:0.08}, V2:{stDeviation:0.06}, V3:{stDeviation:0.05}, aVF:{tWaveAmplitude:-0.15} }, { epsilon:true }),
+  preset('dextrocardia','Dextrocardia','congenital',{ qrsAxis:-90 },
+    { I:{rWaveAmplitude:-0.5,invert:true}, aVR:{invert:false,rWaveAmplitude:0.8}, V1:{rWaveAmplitude:0.8}, V6:{rWaveAmplitude:0.1,sWaveDepth:1.0} })
+];
+
+function applyHyperkalemiaSeverity(params, severity) {
+  const s = severity || 1;
+  if (s <= 1) Object.assign(params, { tWaveAmplitude:0.68, tWaveSymmetry:0.9, qtInterval:330, prInterval:190 });
+  else if (s <= 2) Object.assign(params, { tWaveAmplitude:0.58, tWaveSymmetry:0.92, qtInterval:295, prInterval:270, qrsDuration:115, pWaveAmplitude:0.05, pWaveDuration:55 });
+  else Object.assign(params, { tWaveAmplitude:0.15, pWaveAmplitude:0, pWaveMorphology:'absent', qrsDuration:185, prInterval:300, heartRate:42, fibrillatory:0.35, sWaveDepth:0.1 });
+}
+
+/* ============================================================
+   SECTION: Education Data
+   ============================================================ */
+const EDUCATION = {
+  'normal': { overview:'Normal sinus rhythm is the expected cardiac rhythm with a P wave before every QRS, regular R-R intervals, and a normal axis. It indicates intact sinoatrial node function and normal AV conduction.', findings:['Regular rhythm','P wave before each QRS','Rate 60–100 bpm','Normal PR, QRS, and QT intervals','Normal QRS axis (−30° to +90°)'], pathophysiology:'The SA node depolarises at 60–100 bpm, propagating through atrial myocardium (P wave), then through the AV node and His-Purkinje system (PR interval), causing synchronised ventricular depolarisation (QRS) and repolarisation (ST-T).', criteria:['Rate 60–100 bpm with regular rhythm','Upright P in I, II, aVF','Each P followed by QRS','PR 120–200 ms, QRS <120 ms'] },
+  'sinus-tach': { overview:'Sinus tachycardia is a regular rhythm >100 bpm with normal P waves, usually reflecting increased sympathetic drive or physiological stress.', findings:['Rate >100 bpm','Normal P wave morphology','Regular R-R intervals','Normal QRS duration','May have mild ST changes at high rates'], pathophysiology:'Enhanced SA node automaticity from sympathetic stimulation (exercise, fever, pain, anxiety, hypovolaemia) increases rate while preserving normal conduction sequence.', criteria:['Rate >100 bpm','P before each QRS','Normal axis and intervals except rate-dependent shortening'] },
+  'sinus-brady': { overview:'Sinus bradycardia is a regular rhythm <60 bpm with normal P waves. It may be physiological (athletes, sleep) or pathological (AV node disease, drugs).', findings:['Rate <60 bpm','Normal P waves','Regular rhythm','Normal QRS','PR may be slightly prolonged'], pathophysiology:'Reduced SA node automaticity from vagal tone, beta-blockers, calcium channel blockers, or intrinsic sinus node dysfunction decreases firing rate without altering conduction pathway.', criteria:['Rate <60 bpm with sinus P waves','Regular rhythm','QRS <120 ms'] },
+  'avb1': { overview:'First-degree AV block shows prolonged PR interval with every P wave conducted. It is often benign but may progress or indicate underlying conduction disease.', findings:['PR interval >200 ms','Every P followed by QRS','Regular rhythm','Normal QRS morphology'], pathophysiology:'Delayed conduction through the AV node prolongs the PR interval without dropped beats. Causes include increased vagal tone, medications, ischaemia, or early fibrosis.', criteria:['PR >200 ms','1:1 AV conduction','No dropped QRS complexes'] },
+  'avb2-wenckebach': { overview:'Mobitz type I (Wenckebach) shows progressive PR prolongation until a beat is dropped. Usually benign, often at the AV node level.', findings:['Progressive PR lengthening','Grouped beating','Dropped QRS after longest PR','Narrow QRS typically','P waves regular at atrial rate'], pathophysiology:'Progressive AV nodal refractoriness causes lengthening PR until an atrial impulse fails to conduct, then the cycle resets. Often vagally mediated or due to inferior MI.', criteria:['Progressive PR prolongation before non-conducted P','More P waves than QRS','Narrow QRS suggests nodal level block'] },
+  'avb2-mobitz2': { overview:'Mobitz type II block shows intermittent non-conducted P waves without PR prolongation. It indicates infranodal disease and carries risk of complete heart block.', findings:['Fixed PR interval','Sudden dropped QRS','P waves regular','Often wide QRS if bundle branch involved'], pathophysiology:'Fixed block below the AV node in the His bundle or bundle branches causes sudden failure of conduction without warning PR changes. Requires pacing evaluation.', criteria:['Constant PR on conducted beats','Intermittent non-conducted P without PR lengthening','Often associated with BBB'] },
+  'avb3': { overview:'Complete (third-degree) AV block means no AV conduction. Atria and ventricles beat independently — a medical emergency if ventricular escape is slow.', findings:['AV dissociation — P and QRS unrelated','Regular ventricular escape rhythm','Bradycardia','Wide QRS if ventricular escape','Canon P waves may be visible'], pathophysiology:'Complete interruption of AV conduction forces ventricular escape from junction or ventricle at 20–40 bpm. Atrial rate continues independently from SA node.', criteria:['No relationship between P and QRS','Atrial rate > ventricular rate','Requires permanent pacing if symptomatic'] },
+  'lbbb': { overview:'Left bundle branch block widens the QRS due to delayed left ventricular activation. It obscures ST-T interpretation for MI and requires modified criteria.', findings:['QRS ≥120 ms','Broad monophasic R in V5–V6','QS or rS in V1','Absent septal Q in I, V6','Discordant ST-T (opposite QRS direction)'], pathophysiology:'Block of the left bundle forces LV depolarisation via slow myocyte-to-myocyte spread from the RV, delaying LV activation and producing characteristic wide R in lateral leads.', criteria:['QRS ≥120 ms','Broad notched R in I, aVL, V5, V6','rS or QS in V1','Sgarbossa criteria for MI in LBBB'] },
+  'rbbb': { overview:'Right bundle branch block delays RV activation, producing an RSR\' (M-shaped) pattern in V1 and wide S waves in lateral leads.', findings:['QRS ≥120 ms','RSR\' pattern in V1–V2','Wide slurred S in I, V5, V6','Normal axis usually','T wave inversion in V1–V2 may be normal'], pathophysiology:'RV depolarises late via slow spread across the septum after LV activation, creating the terminal R\' in right precordial leads and deep S laterally.', criteria:['QRS ≥120 ms','rsR\' or RSR\' in V1–V2','Slurred S in I, V5, V6'] },
+  'lafb': { overview:'Left anterior fascicular block causes left axis deviation with small QRS widening, indicating conduction delay in the anterior fascicle of the left bundle.', findings:['Left axis deviation (−45° to −90°)','qR in aVL','rS in II, III, aVF','QRS <120 ms typically','No other cause of LAD'], pathophysiology:'Block in the anterior fascicle delays activation of the anterolateral LV, shifting the mean QRS vector superiorly and leftward.', criteria:['Left axis −45° to −90°','qR in aVL, rS in inferior leads','QRS <120 ms','No LVH or inferior MI'] },
+  'af': { overview:'Atrial fibrillation is chaotic atrial activity with irregularly irregular ventricular response. It increases stroke risk and may cause haemodynamic compromise at rapid rates.', findings:['No discernible P waves','Irregularly irregular R-R','Fibrillatory baseline','Normal QRS (unless aberrancy)','Rate variable'], pathophysiology:'Multiple re-entrant wavelets in atrial myocardium cause disorganised atrial depolarisation at 350–600 bpm. Irregular AV node filtering produces irregular ventricular response.', criteria:['Irregularly irregular rhythm','Absent P waves','Chaotic baseline','Assess stroke risk (CHA₂DS₂-VASc)'] },
+  'aflutter': { overview:'Atrial flutter features organised atrial re-entry at ~300 bpm, often with 2:1 AV block giving ventricular rate ~150 bpm. Sawtooth flutter waves are best seen in inferior leads.', findings:['Sawtooth flutter waves in II, III, aVF','Regular atrial rate ~300 bpm','Ventricular rate depends on AV block ratio','Regular or irregular ventricular response','No P waves'], pathophysiology:'Macro-re-entrant circuit typically in the right atrium (cavotricuspid isthmus) produces regular atrial activation at 250–350 bpm with characteristic flutter waves.', criteria:['Sawtooth pattern in inferior leads','Atrial rate ~250–350 bpm','Typical flutter: inverted in II, III, aVF'] },
+  'vtach': { overview:'Ventricular tachycardia is a wide-complex tachycardia originating from ventricular tissue. It is potentially life-threatening and must be distinguished from SVT with aberrancy.', findings:['Wide QRS (>120 ms)','Rate usually >100 bpm, often 150–200','AV dissociation (if visible)','Concordance in precordial leads','Fusion/capture beats if intermittent conduction'], pathophysiology:'Re-entrant or automatic focus in ventricular myocardium bypasses the His-Purkinje system, producing slow myocyte propagation and wide bizarre QRS complexes.', criteria:['Wide complex tachycardia','Brugada algorithm for VT vs SVT','Treat as VT until proven otherwise'] },
+  'lvh': { overview:'Left ventricular hypertrophy reflects chronic pressure or volume overload of the LV. ECG has moderate sensitivity but specific voltage criteria aid diagnosis.', findings:['Increased voltage in lateral leads','Sokolow-Lyon: S V1 + R V5/V6 ≥35 mm','Strain pattern: ST depression, T inversion in lateral leads','Left axis deviation may be present','Prolonged QRS slightly'], pathophysiology:'Chronic increased LV wall stress (hypertension, aortic stenosis, HCM) causes myocyte hypertrophy and altered repolarisation, increasing QRS amplitude and producing strain.', criteria:['Sokolow-Lyon: S V1 + max(R V5, R V6) ≥35 mm','Cornell: R aVL + S V3 >28 mm (men) or >20 mm (women)','Romhilt-Estes point score'] },
+  'rvh': { overview:'Right ventricular hypertrophy indicates chronic RV pressure overload, commonly from pulmonary hypertension or cor pulmonale.', findings:['Right axis deviation','Dominant R in V1','Deep S in V5–V6','P pulmonale (tall P in II)','ST-T changes in right precordial leads'], pathophysiology:'RV wall thickening from pulmonary hypertension shifts the QRS vector rightward and anteriorly, producing tall R in V1 and deep S laterally.', criteria:['R V1 >7 mm or R/S >1','Right axis >+110°','Supporting: P pulmonale, RAD'] },
+  'stemi-anterior': { overview:'Anterior STEMI indicates acute occlusion of the LAD territory, affecting V1–V4. It requires urgent reperfusion therapy.', findings:['ST elevation ≥1 mm in ≥2 contiguous precordial leads (V1–V4)','Reciprocal ST depression in inferior leads','Hyperacute T waves early','Q waves develop with evolution','New LBBB may represent equivalent MI'], pathophysiology:'Acute LAD occlusion causes transmural ischaemia of the anterior, septal, and often lateral LV wall, producing current of injury with ST elevation in anterior leads.', criteria:['ST elevation ≥1 mm in ≥2 of V1–V4 (men)','≥1.5 mm in V2–V3 (men <40)','Immediate reperfusion indicated'] },
+  'stemi-inferior': { overview:'Inferior STEMI typically results from RCA or circumflex occlusion, affecting leads II, III, and aVF. Right ventricular involvement must be assessed.', findings:['ST elevation in II, III, aVF (≥2 contiguous)','Reciprocal ST depression in I, aVL','ST elevation in V1 may indicate RV infarct','Check right-sided leads (V4R)','Bradycardia/AV block common (RCA supplies AV node)'], pathophysiology:'Occlusion of the RCA (or dominant circumflex) causes transmural infarction of the inferior wall, with reciprocal changes in lateral leads.', criteria:['ST elevation ≥1 mm in II, III, aVF','Check V4R for RV involvement','Avoid nitrates if RV infarct suspected'] },
+  'stemi-lateral': { overview:'Lateral STEMI involves the circumflex territory with ST elevation in I, aVL, V5, and V6.', findings:['ST elevation in I, aVL, V5, V6','Reciprocal changes in inferior leads','May accompany anterior or inferior STEMI','New Q waves in lateral leads with evolution'], pathophysiology:'LCx or diagonal branch occlusion causes transmural ischaemia of the lateral LV free wall, elevating ST in high lateral and lateral precordial leads.', criteria:['ST elevation in I, aVL, V5, V6','≥1 mm in ≥2 contiguous leads'] },
+  'posterior-mi': { overview:'Posterior MI often presents with ST depression and tall R waves in V1–V3 (mirror image). Formal diagnosis requires posterior leads V7–V9.', findings:['Horizontal ST depression V1–V3','Tall broad R in V1–V2 (R/S >1)','ST elevation in V7–V9 if recorded','Often concurrent with inferior or lateral STEMI'], pathophysiology:'Occlusion of the posterior descending artery or circumflex branches causes posterior wall transmural ischaemia, appearing as reciprocal anterior changes.', criteria:['ST elevation ≥0.5 mm in V7–V9','Or ST depression V1–V3 with inferior STEMI'] },
+  'nstemi': { overview:'NSTEMI and unstable angina show ischaemic ST depression and/or T wave changes without persistent ST elevation. Troponin distinguishes NSTEMI from UA.', findings:['ST depression ≥0.5 mm in ≥2 leads','T wave inversion in affected territory','No persistent ST elevation','May have transient ST elevation (transmural ischaemia)'], pathophysiology:'Subendocardial ischaemia from partial coronary occlusion or supply-demand mismatch causes ST depression and repolarisation abnormalities without transmural injury.', criteria:['Ischaemic ST depression or T inversion','Troponin elevation = NSTEMI','Early invasive strategy per guidelines'] },
+  'old-anterior-mi': { overview:'Old (evolved) anterior MI shows persistent pathological Q waves indicating completed transmural infarction of the anterior wall.', findings:['Pathological Q waves in V1–V4 (≥40 ms, ≥25% R amplitude)','Reduced R wave progression','Persistent T inversion may remain','ST should be at baseline (no acute elevation)'], pathophysiology:'Completed transmural infarction causes electrical silence in scarred myocardium, manifesting as deep Q waves and loss of normal R progression.', criteria:['Q wave ≥40 ms and ≥25% of R in affected leads','Corresponds to prior anterior territory'] },
+  'pericarditis': { overview:'Acute pericarditis causes diffuse ST elevation from epicardial inflammation, distinct from regional STEMI by its widespread pattern and PR depression.', findings:['Diffuse ST elevation (concave up)','PR segment depression','Saddle-shaped ST in mid-precordial leads','No reciprocal depression (unlike STEMI)','Spodick sign: downward PR segment'], pathophysiology:'Epicardial inflammation creates a subepicardial injury current affecting multiple territories simultaneously, unlike single-vessel coronary occlusion.', criteria:['≥2 leads with ST elevation','PR depression','Clinical: pleuritic pain, friction rub','Exclude regional STEMI'] },
+  'hyperkalemia': { overview:'Hyperkalemia progressively affects conduction — peaked T waves first, then PR prolongation, QRS widening, and sine wave pattern at severe levels.', findings:['Peaked narrow T waves (early)','Prolonged PR interval','Flattened/absent P waves','Widened QRS','Sine wave pattern (pre-arrest)'], pathophysiology:'Elevated extracellular K+ depolarises resting membrane potential, impairing atrial and ventricular conduction and accelerating repolarisation (peaked T).', criteria:['Serum K+ correlates with ECG changes','K >6.5: urgent treatment','Sine wave: imminent cardiac arrest'] },
+  'hypokalemia': { overview:'Hypokalemia prolongs repolarisation, causing flattened T waves, prominent U waves, and ST depression. It predisposes to arrhythmias including Torsades de Pointes.', findings:['Flattened T waves','Prominent U waves','ST depression','Prolonged QU/QT interval','Arrhythmia risk'], pathophysiology:'Low K+ hyperpolarises cells and delays repolarisation, producing U waves from delayed Purkinje/ventricular repolarisation and QT prolongation.', criteria:['U waves best seen V2–V4','Correct K+ and Mg2+','Monitor QT interval'] },
+  'hypercalcemia': { overview:'Hypercalcemia shortens the QT interval by accelerating repolarisation. The ST segment is shortened with a normal or near-normal T wave.', findings:['Short QT interval','Shortened ST segment','Normal QRS','May have mild bradycardia'], pathophysiology:'Elevated calcium shortens phase 2 of the action potential, accelerating ventricular repolarisation and shortening the QT interval.', criteria:['QTc shortened for heart rate','Correlate with serum calcium'] },
+  'hypocalcemia': { overview:'Hypocalcemia prolongs the QT interval by delaying repolarisation, notably prolonging the ST segment.', findings:['Prolonged QT interval','Prolonged ST segment','T wave may be normal width','No U waves typically'], pathophysiology:'Low calcium prolongs phase 2 plateau of the ventricular action potential, extending ST duration and total QT.', criteria:['QT prolongation with long ST segment','Correct calcium; monitor for TdP'] },
+  'hypomagnesemia': { overview:'Hypomagnesemia often accompanies hypokalemia and causes QT prolongation, U waves, and arrhythmia susceptibility including Torsades de Pointes.', findings:['Prolonged QT','U waves','T wave flattening','May mimic hypokalemia','Arrhythmia risk'], pathophysiology:'Magnesium is essential for K+ channel function and stable repolarisation. Depletion prolongs QT and predisposes to early afterdepolarisations.', criteria:['Correct Mg2+ and K+ together','Essential in refractory hypokalemia'] },
+  'hypothermia': { overview:'Hypothermia produces characteristic Osborn (J) waves — positive deflections at the J point — along with bradycardia and interval prolongation.', findings:['Osborn J waves (positive J-point deflection)','Sinus bradycardia','Prolonged PR, QRS, QT','Muscle tremor artifact possible','Arrhythmia risk during rewarming'], pathophysiology:'Cold slows all cardiac conduction and alters repolarisation heterogeneity, producing a distinct positive deflection at the QRS-ST junction (J wave).', criteria:['J waves + clinical hypothermia','Shivering artifact may mimic fibrillation','Handle gently — arrhythmias during rewarming'] },
+  'digoxin': { overview:'Digoxin effect produces the characteristic "Salvador Dalí moustache" ST depression (reverse tick), with bradycardia and PR prolongation. Toxicity adds arrhythmias.', findings:['Reverse tick ST depression (downsloping with upslope)','Short QT interval','PR prolongation','Bradycardia','T wave flattening or inversion'], pathophysiology:'Digoxin inhibits Na+/K+-ATPase, shortening repolarisation (short QT) and causing characteristic scooped ST changes. AV nodal effects prolong PR.', criteria:['Scooped ST in lateral leads','Clinical correlation with digoxin level','Toxicity: arrhythmias, hyperkalemia, AV block'] },
+  'quinidine': { overview:'Quinidine and related class Ia antiarrhythmics prolong QT and QRS, and may cause Torsades de Pointes at toxic levels.', findings:['Prolonged QT interval','Widened QRS','T wave abnormalities','U waves at toxic levels','Torsades de Pointes risk'], pathophysiology:'Sodium and potassium channel blockade slows conduction (wide QRS) and delays repolarisation (long QT), creating proarrhythmic substrate.', criteria:['Monitor QTc on therapy','Quinidine syncope = TdP until proven otherwise'] },
+  'tca': { overview:'Tricyclic antidepressant overdose causes sodium channel blockade manifesting as wide QRS, right axis, and prominent R wave in aVR — a key toxidrome ECG.', findings:['Wide QRS (>100 ms)','Tall R wave in aVR (R/S >0.7)','Rightward axis','Prolonged QT','Sinus tachycardia'], pathophysiology:'TCAs block fast sodium channels, slowing ventricular conduction (wide QRS). Rightward terminal forces produce the characteristic tall aVR R wave.', criteria:['R wave aVR ≥3 mm or R/S >0.7','QRS >100 ms predicts seizures','QRS >160 ms predicts arrhythmia'] },
+  'bb-overdose': { overview:'Beta-blocker overdose causes bradycardia, AV conduction delay, and hypotension through excessive beta-receptor blockade.', findings:['Marked sinus bradycardia','PR prolongation','Narrow QRS usually','High-grade AV block possible','Hypotension clinically'], pathophysiology:'Blockade of beta-1 receptors reduces SA node automaticity and AV nodal conduction, with unopposed alpha effects in some mixed overdoses.', criteria:['Bradycardia + beta-blocker exposure','Glucagon is antidote','High-dose insulin therapy may help'] },
+  'cocaine': { overview:'Cocaine toxicity causes sympathetic surge with tachycardia, hypertension, and ischaemic ST changes from coronary vasospasm or thrombosis.', findings:['Sinus tachycardia','ST elevation or depression (vasospasm)','Early repolarisation patterns possible','Arrhythmias','Normal QRS usually'], pathophysiology:'Cocaine blocks catecholamine reuptake and causes alpha-mediated coronary vasoconstriction, producing supply-demand ischaemia and ST changes.', criteria:['Clinical toxidrome + ECG ischaemia','Benzodiazepines first-line','Avoid pure beta-blockers (unopposed alpha)'] },
+  'amiodarone': { overview:'Amiodarone prolongs QT and may produce U waves due to potassium channel effects. It also causes bradycardia and variable T wave changes.', findings:['Prolonged QT interval','U waves','Bradycardia','T wave changes variable','Atrial flutter with slow ventricular response possible'], pathophysiology:'Amiodarone blocks multiple ion channels (K+, Na+, Ca2+), prolonging repolarisation and QT, with bradycardic effects on SA and AV nodes.', criteria:['Monitor QTc regularly on amiodarone','Risk of TdP especially with hypokalemia'] },
+  'wpw': { overview:'Wolff-Parkinson-White syndrome features a delta wave (slurred QRS upstroke), short PR, and wide QRS due to ventricular pre-excitation via an accessory pathway.', findings:['Short PR interval (<120 ms)','Delta wave (slurred upstroke)','Wide QRS','Pseudo-infarction Q waves possible','ST-T discordance from pre-excitation'], pathophysiology:'An accessory pathway (Bundle of Kent) bypasses the AV node, pre-exciting ventricular myocardium and fusing with normal conduction to produce delta waves.', criteria:['Short PR + delta wave + wide QRS','Risk of SVT and pre-excited AF','Ablation curative'] },
+  'brugada1': { overview:'Brugada type 1 pattern shows coved ST elevation ≥2 mm in V1–V2 followed by negative T wave. It indicates increased risk of sudden cardiac death.', findings:['Coved ST elevation V1–V2','Negative T wave following cove','Type 1 is diagnostic pattern','May be unmasked by fever or drugs','QRS usually normal width'], pathophysiology:'Abnormal repolarisation in the RV outflow tract creates a transmural voltage gradient, producing the characteristic coved ST elevation pattern.', criteria:['Type 1: coved ST ≥2 mm in ≥1 of V1–V2','Spontaneous or drug-induced (ajmaline/flecainide)','ICD if symptomatic or inducible VT'] },
+  'brugada2': { overview:'Brugada type 2 shows saddleback ST elevation with positive or biphasic T waves — a less specific pattern that may convert to type 1 with provocative testing.', findings:['Saddleback ST elevation V1–V2','Positive T wave (high take-off)','Less specific than type 1','May convert with sodium channel blockers'], pathophysiology:'Similar RVOT repolarisation abnormality as type 1 but with less pronounced coving, representing a spectrum of the same ion channel dysfunction.', criteria:['Saddleback ST in V1–V2','Provocative testing if clinical suspicion'] },
+  'brugada3': { overview:'Brugada type 3 is a subtle saddleback pattern that is non-diagnostic alone but may suggest Brugada syndrome in the right clinical context.', findings:['Subtle saddleback ST in V1–V2','ST elevation <2 mm','Non-diagnostic alone','Requires clinical correlation'], pathophysiology:'Mild form of RVOT repolarisation abnormality on the Brugada spectrum.', criteria:['Type 3 alone is not diagnostic','Combine with clinical risk factors'] },
+  'long-qt': { overview:'Congenital long QT syndrome prolongs repolarisation, predisposing to Torsades de Pointes and syncope/sudden death, especially with QT-prolonging triggers.', findings:['Prolonged QTc (>480 ms often)','Broad-based T waves','T wave alternans during stress','Bradycardia for age in LQT2/3','Triggers: exercise, startle, sleep'], pathophysiology:'Inherited ion channel mutations delay ventricular repolarisation, creating early afterdepolarisations that trigger polymorphic VT (TdP).', criteria:['QTc >480 ms (or >440 ms with symptoms)','Schwartz score for diagnosis','Beta-blockers; ICD if high risk'] },
+  'short-qt': { overview:'Short QT syndrome is a rare congenital condition with abbreviated repolarisation and increased risk of atrial fibrillation and sudden cardiac death.', findings:['Short QTc (<340 ms)','Tall peaked T waves','Short ST segment','Atrial fibrillation common','Normal QRS'], pathophysiology:'Gain-of-function mutations in repolarising potassium channels accelerate repolarisation, shortening QT and creating arrhythmogenic substrate.', criteria:['QTc ≤340 ms diagnostic','QTc 340–360 ms with symptoms/family history','ICD consideration'] },
+  'hcm': { overview:'Hypertrophic cardiomyopathy shows LVH voltage criteria, deep Q waves (septal hypertrophy), and repolarisation abnormalities. It is a leading cause of sudden death in young athletes.', findings:['LVH voltage criteria','Deep narrow Q waves in inferior/lateral leads','Giant T wave inversion (apical HCM)','Left axis deviation','Abnormal R progression'], pathophysiology:'Asymmetric septal hypertrophy and myocardial disarray alter depolarisation vectors and repolarisation, producing Q waves and strain patterns disproportionate to age.', criteria:['LVH + deep Q waves in young patient','Exclude athlete heart and HCM on echo','SCD risk stratification'] },
+  'arvd': { overview:'ARVC/ARVD affects the right ventricle with fibrofatty replacement, causing epsilon waves, T inversion in right precordial leads, and ventricular arrhythmias.', findings:['Epsilon wave (small deflection after QRS in V1–V3)','T wave inversion V1–V3 (beyond age 14)','Localised QRS prolongation V1–V3','Ventricular arrhythmias with LBBB morphology','Mild RAD'], pathophysiology:'Fibrofatty infiltration of the RV myocardium creates delayed activation in the RV free wall, producing epsilon waves and arrhythmogenic substrate.', criteria:['2010 Task Force Criteria (major/minor)','T inversion V1–V3 + VT with LBBB morphology','MRI gold standard'] },
+  'dextrocardia': { overview:'Dextrocardia (mirror-image heart) reverses the expected ECG pattern — inverted P and QRS in I, positive aVR, and reversed precordial R wave progression.', findings:['Negative P and QRS in lead I','Positive QRS in aVR (instead of negative)','Reversed R wave progression V1→V6','Right-sided precordial leads needed for standard interpretation','RAE/LAE patterns reversed'], pathophysiology:'The heart sits in the right hemithorax with apex pointing rightward, reversing the standard limb and precordial lead vectors.', criteria:['Global inversion I + positive aVR','Confirm with chest X-ray and echo','Place precordial leads on right chest for standard view'] }
+};
+
+const TREATMENT = {
+  'normal': { urgency:'supportive', steps:['No cardiac treatment required','Reassurance and treat underlying cause if symptomatic'], note:'Routine follow-up if incidental finding.' },
+  'sinus-tach': { urgency:'routine', steps:['Identify and treat cause (fever, pain, hypovolaemia, anxiety)','Correct electrolytes if abnormal','Beta-blocker only if symptomatic and no contraindication'], note:'Persistent unexplained tachycardia warrants further workup.' },
+  'sinus-brady': { urgency:'routine', steps:['Assess haemodynamic stability','Review nodal-blocking drugs (beta-blockers, CCBs, digoxin)','Atropine 0.5–1 mg IV if symptomatic','Transcutaneous pacing if unstable and refractory'], note:'Athletic bradycardia may be physiological.' },
+  'avb1': { urgency:'routine', steps:['Review medications and electrolytes','Monitor for progression to higher-grade block','Treat underlying ischaemia, Lyme, or thyroid disease if present'], note:'Often benign; admit if symptomatic or associated with inferior MI.' },
+  'avb2-wenckebach': { urgency:'urgent', steps:['Hold AV-nodal blocking agents','Atropine if symptomatic bradycardia','Transcutaneous pacing if haemodynamically unstable','Monitor on telemetry; usually transient with inferior MI'], note:'Mobitz I is often AV-nodal and may respond to atropine.' },
+  'avb2-mobitz2': { urgency:'emergent', steps:['Urgent cardiology consult — high risk of complete heart block','Transvenous pacing if symptomatic or wide QRS','Avoid atropine as sole therapy if infranodal','Prepare for permanent pacemaker'], note:'Mobitz II usually requires pacing evaluation even if asymptomatic.' },
+  'avb3': { urgency:'emergent', steps:['Immediate transcutaneous then transvenous pacing if unstable','Atropine 0.5–1 mg IV while pacing prepared (may help junctional escape)','Dopamine or adrenaline infusion if pacing delayed','Urgent cardiology / permanent pacemaker planning'], note:'Complete heart block with slow escape is an emergency.' },
+  'lbbb': { urgency:'routine', steps:['No acute treatment for isolated chronic LBBB','Use modified Sgarbossa criteria if chest pain','Echocardiogram if new or with heart failure symptoms'], note:'New LBBB with ischaemic symptoms may be STEMI equivalent.' },
+  'rbbb': { urgency:'routine', steps:['No specific treatment for isolated RBBB','Evaluate for pulmonary embolism if acute and symptomatic','Echocardiogram if associated with RV strain or syncope'], note:'May be normal variant; new RBBB with PE symptoms needs CTPA.' },
+  'lafb': { urgency:'routine', steps:['No acute treatment','Assess for structural heart disease and hypertension','Repeat ECG if symptoms of syncope or VT'], note:'Often associated with LV disease; correlate clinically.' },
+  'af': { urgency:'urgent', steps:['Rate control (beta-blocker, CCB, or digoxin) or rhythm control per stability','Anticoagulation per CHA₂DS₂-VASc unless contraindicated','Correct electrolytes (K⁺, Mg²⁺) and treat precipitants','Cardioversion if unstable; TEE-guided if >48 h'], note:'Assess stroke risk and bleeding risk before anticoagulation.' },
+  'aflutter': { urgency:'urgent', steps:['Rate control or cardioversion depending on stability','Anticoagulation as for AF','Consider urgent cardioversion if 2:1 conduction with rapid rate','Definitive treatment: catheter ablation of cavotricuspid isthmus'], note:'2:1 flutter often presents at ~150 bpm.' },
+  'vtach': { urgency:'emergent', steps:['Unstable: immediate synchronised cardioversion','Stable monomorphic VT: amiodarone 150 mg IV or procainamide','Correct K⁺, Mg²⁺, and ischaemia','Prepare for cardiac arrest protocol and post-resuscitation care'], note:'Wide-complex tachycardia — treat as VT until proven otherwise.' },
+  'lvh': { urgency:'routine', steps:['Treat hypertension and volume overload','ACE inhibitor/ARB as indicated','Echocardiogram for LV function and wall thickness'], note:'Address underlying cause; no acute ECG-specific therapy.' },
+  'rvh': { urgency:'urgent', steps:['Treat underlying pulmonary hypertension or lung disease','Supplemental O₂ if hypoxic','Echocardiogram and RV function assessment','Avoid fluids in acute RV infarction if coexistent'], note:'RVH on ECG warrants evaluation of pulmonary vascular disease.' },
+  'stemi-anterior': { urgency:'emergent', steps:['Activate STEMI / PCI pathway immediately','Aspirin 300 mg + P2Y12 inhibitor unless contraindicated','Anticoagulation per local protocol','Primary PCI preferred; fibrinolysis if PCI >120 min delay','Morphine, O₂ only if hypoxic, nitrates if BP allows'], note:'Door-to-balloon time is critical for anterior LAD occlusion.' },
+  'stemi-inferior': { urgency:'emergent', steps:['STEMI pathway activation and urgent reperfusion (PCI preferred)','Aspirin + P2Y12 inhibitor + anticoagulation','Obtain right-sided leads (V4R) — avoid nitrates if RV infarct','Atropine for symptomatic bradycardia or AV block','Fluid loading cautiously if RV involvement and hypotensive'], note:'Inferior STEMI often involves RCA; AV block and bradycardia are common.' },
+  'stemi-lateral': { urgency:'emergent', steps:['Urgent reperfusion therapy (PCI preferred)','Dual antiplatelet therapy and anticoagulation','Assess for multivessel disease on angiography','Standard post-MI care and secondary prevention'], note:'Circumflex occlusion — may present without classic anterior changes.' },
+  'posterior-mi': { urgency:'emergent', steps:['Treat as acute MI — urgent reperfusion','Obtain posterior leads V7–V9 if ST elevation not seen anteriorly','Standard ACS medications (aspirin, P2Y12, anticoagulation)','High suspicion when ST depression V1–V3 with inferior STEMI'], note:'Isolated posterior MI may be missed without posterior leads.' },
+  'nstemi': { urgency:'urgent', steps:['Aspirin + P2Y12 inhibitor + anticoagulation','Anti-ischaemic therapy (nitrates, beta-blocker if no contraindication)','Risk stratify (GRACE/TIMI) — early invasive strategy if high risk','Serial troponins and telemetry'], note:'NSTEMI = troponin elevation without persistent ST elevation.' },
+  'old-anterior-mi': { urgency:'supportive', steps:['Secondary prevention: aspirin, statin, ACE inhibitor as indicated','Echocardiogram for LV function','Cardiac rehabilitation','No acute reperfusion — infarct is evolved'], note:'Q waves indicate completed transmural infarction.' },
+  'pericarditis': { urgency:'urgent', steps:['NSAIDs (ibuprofen/indomethacin) + colchicine','Treat underlying cause (viral, autoimmune, uraemia)','Avoid thrombolysis — this is not STEMI','Glucocorticoids only if refractory or specific indications','Admit if troponin rise, fever, or tamponade concern'], note:'Diffuse ST elevation + PR depression distinguishes from regional STEMI.' },
+  'hyperkalemia': { urgency:'emergent', steps:['Stabilise myocardium: calcium gluconate 10% 10 mL IV if ECG changes or K⁺ ≥6.5','Shift K⁺: insulin 10 U + glucose; nebulised salbutamol','Remove K⁺: kayexalate, loop diuretics, dialysis if refractory','Stop K⁺-sparing drugs and treat renal failure'], note:'ECG changes precede arrest — treat before critical K⁺ level.' },
+  'hypokalemia': { urgency:'urgent', steps:['Oral or IV potassium replacement per severity','Always check and replace magnesium','Continuous telemetry if QT prolongation','Remove diuretics or treat diarrhoea/vomiting cause'], note:'K⁺ <3.0 mEq/L or arrhythmia requires urgent correction.' },
+  'hypercalcemia': { urgency:'urgent', steps:['IV 0.9% saline hydration first line','Calcitonin or bisphosphonates for malignancy-related hypercalcaemia','Treat primary cause (hyperparathyroidism, malignancy)','ECG monitoring — short QT improves with correction'], note:'Severe hypercalcaemia can cause confusion and renal failure.' },
+  'hypocalcemia': { urgency:'urgent', steps:['IV calcium gluconate if symptomatic (tetany, seizures, QT prolongation)','Oral calcium + vitamin D for chronic deficiency','Correct magnesium if low','Treat underlying cause (hypoparathyroidism, renal failure)'], note:'Prolonged QT from hypocalcaemia increases TdP risk.' },
+  'hypomagnesemia': { urgency:'urgent', steps:['IV magnesium sulphate 2 g over 10–20 min if symptomatic or arrhythmia','Replace concurrently with potassium if low','Continue Mg²⁺ repletion 24–48 h','Review diuretics, alcohol use, and GI losses'], note:'Refractory hypokalaemia often requires magnesium correction.' },
+  'hypothermia': { urgency:'emergent', steps:['Active rewarming (external and core)','Handle patient gently — risk of VF during rewarming','Correct electrolyte shifts during rewarming','Treat coexisting causes (exposure, sepsis, toxins)'], note:'Osborn J waves resolve with rewarming; avoid rough movement.' },
+  'digoxin': { urgency:'emergent', steps:['Hold digoxin immediately','Digoxin-specific antibody fragments (Fab) for life-threatening toxicity or K⁺ >5.5','Treat arrhythmias per ACLS — avoid cardioversion if possible','Correct hypokalaemia cautiously (risk of rapid toxicity shift)'], note:'Digoxin toxicity worsens with hypokalaemia.' },
+  'quinidine': { urgency:'emergent', steps:['Stop quinidine / class Ia agent immediately','Magnesium 2 g IV for Torsades de Pointes','Overdrive pacing or isoprenaline if TdP recurrent','Monitor QT until normalised'], note:'Quinidine syncope is TdP until proven otherwise.' },
+  'tca': { urgency:'emergent', steps:['Sodium bicarbonate 1–2 mEq/kg IV bolus for QRS >100 ms','Repeat bicarbonate to narrow QRS; target pH 7.50–7.55','Benzodiazepines for seizures; avoid class Ia/Ic antiarrhythmics','Intubation and supportive care; lipid emulsion per toxicology'], note:'Wide QRS and tall R in aVR are hallmarks of TCA toxicity.' },
+  'bb-overdose': { urgency:'emergent', steps:['Glucagon 5–10 mg IV bolus then infusion (first-line antidote)','Atropine / pacing for bradycardia','High-dose insulin euglycaemic therapy if refractory shock','IV fluids and vasopressors as needed'], note:'Pure beta-blockade — avoid isolated beta-blocker without alpha context in mixed overdose.' },
+  'cocaine': { urgency:'emergent', steps:['Benzodiazepines first line for agitation and hypertension','Nitrates and CCB for coronary vasospasm; avoid pure beta-blockers','Reperfusion if STEMI confirmed','Cooling and sedation; treat hyperthermia and rhabdomyolysis'], note:'Cocaine STEMI is often vasospasm — beta-blocker monotherapy may worsen vasospasm.' },
+  'amiodarone': { urgency:'routine', steps:['Review indication and duration of therapy','Check TFTs, LFTs, and pulmonary function periodically','Monitor QTc — reduce dose or stop if excessive prolongation','Correct K⁺ and Mg²⁺ before attributing arrhythmia to drug'], note:'Amiodarone toxicity is multi-organ; ECG shows QT prolongation.' },
+  'wpw': { urgency:'urgent', steps:['Avoid AV-nodal only blockers (digoxin, verapamil, diltiazem) in pre-excited AF','Procainamide or ibutilide for pre-excited AF with rapid conduction','Elective catheter ablation for symptomatic WPW','Cardioversion if unstable'], note:'Pre-excited AF can degenerate to VF — use appropriate agents.' },
+  'brugada1': { urgency:'urgent', steps:['Avoid fever and sodium-channel blocking drugs','ICD if history of cardiac arrest or documented VT/VF','Refer to inherited arrhythmia specialist','Isoprenaline infusion in electrical storm / VF storm'], note:'Type 1 pattern is diagnostic; risk stratification guides ICD.' },
+  'brugada2': { urgency:'routine', steps:['Specialist referral for risk assessment','Provocative testing (ajmaline/flecainide) if clinical suspicion','Avoid triggers: fever, cocaine, class I antiarrhythmics','Family screening if confirmed syndrome'], note:'Type 2 is not diagnostic alone — may convert to type 1.' },
+  'brugada3': { urgency:'supportive', steps:['Clinical correlation and specialist review if symptoms','Avoid sodium-channel blockers and fever when possible','Repeat ECG if syncope or family history of SCD'], note:'Type 3 pattern alone is non-diagnostic.' },
+  'long-qt': { urgency:'urgent', steps:['Stop QT-prolonging drugs and correct electrolytes','Beta-blockers (nadolol/propranolol) for congenital LQTS','Avoid competitive sport and loud alarms in LQT2','ICD if high-risk features or recurrent syncope despite beta-blockade'], note:'Acquired LQT — remove offending drug; congenital — genetic workup.' },
+  'short-qt': { urgency:'urgent', steps:['Specialist electrophysiology referral','ICD consideration if symptomatic or family history of SCD','Avoid aggressive QT-shortening triggers','Genetic testing for K⁺ channel mutations'], note:'Short QT syndrome is rare but carries sudden death risk.' },
+  'hcm': { urgency:'routine', steps:['Echocardiogram and risk stratification for SCD','Beta-blockers or verapamil for symptoms','ICD if high-risk features (family SCD, massive LVH, NSVT)','Avoid dehydration and competitive sport if high risk'], note:'Sudden death prevention is central in young patients with HCM.' },
+  'arvd': { urgency:'urgent', steps:['Cardiology referral — MRI for RV fibrofatty replacement','Avoid strenuous exercise until evaluated','ICD if high-risk ventricular arrhythmia','Treat ventricular arrhythmias with beta-blockers or amiodarone'], note:'ARVC is a leading cause of SCD in young athletes.' },
+  'dextrocardia': { urgency:'supportive', steps:['Confirm with imaging (CXR, echo)','Use right-sided precordial leads for standard ECG interpretation','No treatment for isolated mirror-image heart','Surgery only if associated congenital defects'], note:'Dextrocardia reverses limb and precordial vectors — do not misdiagnose as MI.' }
+};
+
+/* ============================================================
+   SECTION: Waveform Generation
+   ============================================================ */
+function gauss(x, c, w, a) { return a * Math.exp(-((x - c) ** 2) / (2 * w * w)); }
+
+function softEnvelope(d) {
+  const x = Math.max(0, 1 - Math.abs(d) ** 1.15);
+  return x * x * (3 - 2 * x);
+}
+
+function softBump(t, center, halfWidth, amp, narrow) {
+  if (!halfWidth || !amp) return 0;
+  const d = (t - center) / halfWidth;
+  const core = Math.exp(-d * d * (narrow ? 2.8 : 1.6));
+  return amp * core * softEnvelope(d);
+}
+
+function roundedArc(t, onset, end, amp) {
+  if (!amp) return 0;
+  const center = (onset + end) * 0.5;
+  const halfWidth = (end - onset) * 0.5;
+  return softBump(t, center, halfWidth, amp, false);
+}
+
+function roundedWave(t, onset, peak, end, amp) {
+  if (!amp) return 0;
+  const halfWidth = Math.max(peak - onset, end - peak, 1) * 0.78;
+  return softBump(t, peak, halfWidth, amp, false);
+}
+
+function qrsComplex(t, qStart, qrs, rAmp, sDep, qWaveDep, morph, delta, invert, vtWide) {
+  let y = 0;
+  const qCenter = qStart + qrs * 0.14;
+  const rCenter = qStart + qrs * 0.40;
+  const sCenter = qStart + qrs * 0.56;
+  const rPrime = qStart + qrs * 0.68;
+  const qW = qrs * (vtWide ? 0.09 : 0.055);
+  const rW = qrs * (vtWide ? 0.22 : 0.13);
+  const sW = qrs * (vtWide ? 0.16 : 0.09);
+
+  if (delta > 0) {
+    y += roundedWave(t, qStart - qrs * 0.22, qStart - qrs * 0.04, qStart + qrs * 0.18, delta * 0.55 * invert);
+    y += roundedWave(t, qStart + qrs * 0.02, qStart + qrs * 0.14, qStart + qrs * 0.34, delta * 0.35 * invert);
+  }
+
+  if (morph === 'rsr') {
+    y += softBump(t, qStart + qrs * 0.20, qrs * 0.11, rAmp * 0.42, true);
+    y -= softBump(t, qStart + qrs * 0.36, qrs * 0.10, sDep * 0.55, true);
+    y += softBump(t, rPrime, qrs * 0.14, rAmp * 0.95, true);
+  } else if (morph === 'qs') {
+    y -= roundedWave(t, qStart + qrs * 0.04, qStart + qrs * 0.38, qStart + qrs * 0.82, sDep * 1.2);
+  } else if (morph === 'monophasicR') {
+    y += roundedWave(t, qStart + qrs * 0.06, qStart + qrs * 0.34, qStart + qrs * 0.58, rAmp * 0.55);
+    y -= softBump(t, qStart + qrs * 0.44, qrs * 0.08, rAmp * 0.14, false);
+    y += roundedWave(t, qStart + qrs * 0.50, qStart + qrs * 0.72, qStart + qrs * 0.96, rAmp * 1.15);
+  } else if (morph === 'vt') {
+    y += softBump(t, rCenter - qrs * 0.08, rW * 1.1, rAmp * 0.65, true);
+    y -= softBump(t, rCenter + qrs * 0.06, sW * 1.1, sDep * 1.1, true);
+    y += gauss(t, rCenter, rW * 0.9, rAmp * 0.25);
+  } else {
+    if (qWaveDep > 0.01) y -= softBump(t, qCenter, qW * 1.1, qWaveDep, true);
+    y += softBump(t, rCenter, rW * 1.05, rAmp, true);
+    if (sDep > 0.01) y -= softBump(t, sCenter, sW * 1.05, sDep, true);
+  }
+  return y;
+}
+
+function peakedTWave(t, center, amp) {
+  return softBump(t, center, 12, amp, true);
+}
+
+function tWaveShape(t, center, width, amp, symmetry, peaked) {
+  if (!amp) return 0;
+  if (peaked) return peakedTWave(t, center, amp);
+  const halfWidth = width * (0.72 + symmetry * 0.18);
+  const skew = (0.5 - symmetry) * halfWidth * 0.22;
+  return softBump(t, center + skew, halfWidth, amp, false);
+}
+
+function leadProjection(lead, axis) {
+  if (PRECORDIAL[lead]) return PRECORDIAL[lead];
+  const angle = LEAD_ANGLES[lead];
+  const rad = (axis - angle) * Math.PI / 180;
+  const proj = Math.cos(rad);
+  return { r: Math.max(0.05, proj), s: Math.max(0.05, -proj), p: proj, t: proj };
+}
+
+function hashNoise(t) {
+  const n = Math.sin(t * 12.9898 + 78.233) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function beatRandom(index, salt) {
+  const n = Math.sin((index + 1) * 127.1 + salt * 311.7) * 43758.5453123;
+  return n - Math.floor(n);
+}
+
+function computeLoopMs(params, minMs, condition, spread) {
+  if (!spread) {
+    const rr = 60000 / params.heartRate;
+    let loopMs = 0;
+    while (loopMs < minMs) loopMs += rr;
+    return loopMs;
+  }
+  const extras = getRhythmExtras(condition);
+  const rrBase = 60000 / params.heartRate;
+  let t = 0;
+  let beatIndex = 0;
+  while (t < minMs) {
+    let rr = rrBase;
+    if (extras.irregular) rr = rrBase * (0.62 + beatRandom(beatIndex, 3) * 0.76);
+    if (extras.avRatio && params.flutterWaves) rr = 60000 / (300 / extras.avRatio);
+    if (extras.wenckebach) rr = rrBase * (1 + (beatIndex % 4) * 0.06);
+    t += rhythmBeatStepMs(rr, params, true);
+    beatIndex++;
+  }
+  return t;
+}
+
+function stOffset(t, stStart, stEnd, dev, shape) {
+  if (t < stStart || t > stEnd) return 0;
+  const frac = (t - stStart) / (stEnd - stStart);
+  switch (shape) {
+    case 'horizontal': return dev;
+    case 'upsloping': return dev > 0 ? dev * (1 + frac * 0.15) : dev * (1 - frac * 0.55);
+    case 'downsloping': return dev * (1 - frac * 0.45);
+    case 'saddle': return dev * Math.sin(frac * Math.PI) * (0.85 + frac * 0.15);
+    case 'concave': return dev * (0.75 + Math.sin(frac * Math.PI * 0.5) * 0.25);
+    case 'reverse_tick':
+      return dev * (Math.sin(frac * Math.PI * 0.5) * 0.65 - frac * 0.55);
+    case 'coved':
+      if (frac < 0.35) return dev * (1 - frac * 0.4);
+      return dev * (0.86 - (frac - 0.35) * 2.8);
+    default: return dev;
+  }
+}
+
+function smoothstep(u) {
+  const x = Math.max(0, Math.min(1, u));
+  return x * x * (3 - 2 * x);
+}
+
+function smoothBlend(a, b, u) {
+  const t = smoothstep(u);
+  return a + (b - a) * t;
+}
+
+function stTComplex(t, qrsEnd, tCenter, tWidth, stDev, stShape, tAmp, tSym, peaked) {
+  if (t < qrsEnd) return 0;
+
+  const stLen = Math.min(110, Math.max(70, (tCenter - tWidth * 0.4) - qrsEnd));
+  const stEnd = qrsEnd + stLen;
+  const fallW = tWidth * (0.95 - tSym * 0.25);
+  const tEnd = tCenter + fallW * 1.4;
+  const tOnly = tWaveShape(t, tCenter, tWidth, tAmp, tSym, peaked);
+  const tBoost = Math.abs(tAmp) > 0.04 ? Math.abs(tAmp) : Math.abs(stDev) * 0.48;
+  const exit = 1 - smoothstep((t - tEnd) / 28);
+
+  let y = 0;
+
+  if (stShape === 'tombstone' && stDev > 0) {
+    if (t <= stEnd) {
+      y = stDev;
+    } else if (t <= tCenter) {
+      const u = (t - stEnd) / Math.max(tCenter - stEnd, 1);
+      y = stDev + tBoost * smoothstep(u);
+    } else {
+      const peak = stDev + tBoost;
+      const u = (t - tCenter) / Math.max(tEnd - tCenter, 1);
+      y = peak * Math.cos(Math.min(u, 1) * Math.PI * 0.5) ** 1.05;
+    }
+  } else if (stDev < -0.04 && (stShape === 'horizontal' || stShape === 'normal')) {
+    if (t <= stEnd) {
+      y = stDev;
+    } else {
+      const u = smoothstep((t - stEnd) / Math.max(tCenter - stEnd, 1));
+      y = smoothBlend(stDev, tOnly, u);
+    }
+  } else if (stShape === 'downsloping' && stDev < 0) {
+    if (t <= stEnd) {
+      const frac = (t - qrsEnd) / Math.max(stEnd - qrsEnd, 1);
+      y = stDev * (1 - frac * 0.35);
+    } else {
+      const u = smoothstep((t - stEnd) / Math.max(tCenter - stEnd, 1));
+      y = smoothBlend(stDev * 0.55, tOnly, u);
+    }
+  } else if (stShape === 'concave' && stDev > 0) {
+    if (t <= stEnd) {
+      const frac = (t - qrsEnd) / Math.max(stEnd - qrsEnd, 1);
+      y = stDev * (0.88 + Math.sin(frac * Math.PI * 0.5) * 0.12);
+    } else {
+      const u = smoothstep((t - stEnd) / Math.max(tCenter - stEnd, 1));
+      y = smoothBlend(stDev, tOnly, u);
+    }
+  } else if ((stShape === 'convex' || stShape === 'upsloping') && stDev > 0.05) {
+    if (t <= stEnd) {
+      const frac = (t - qrsEnd) / Math.max(stEnd - qrsEnd, 1);
+      y = stDev * (1 + frac * 0.12);
+    } else if (t <= tCenter) {
+      const u = (t - stEnd) / Math.max(tCenter - stEnd, 1);
+      y = stDev * 1.12 + tBoost * smoothstep(u);
+    } else {
+      const peak = stDev * 1.12 + tBoost;
+      const u = (t - tCenter) / Math.max(tEnd - tCenter, 1);
+      y = peak * Math.cos(Math.min(u, 1) * Math.PI * 0.5) ** 1.05;
+    }
+  } else if (stShape === 'saddle' || stShape === 'coved' || stShape === 'reverse_tick') {
+    if (t <= stEnd) {
+      y = stOffset(t, qrsEnd, stEnd, stDev, stShape);
+    } else {
+      const u = smoothstep((t - stEnd) / Math.max(tEnd - stEnd, 1));
+      y = smoothBlend(stOffset(stEnd, qrsEnd, stEnd, stDev, stShape), tOnly, u);
+    }
+  } else if (Math.abs(stDev) > 0.02) {
+    if (t <= stEnd) {
+      y = stDev;
+    } else {
+      const u = smoothstep((t - stEnd) / Math.max(tCenter - stEnd, 1));
+      y = smoothBlend(stDev, tOnly, u);
+    }
+  } else if (t <= stEnd) {
+    y = 0;
+  } else {
+    y = tOnly;
+  }
+
+  return y * exit;
+}
+
+function qrsWithJunction(t, qStart, qrs, qrsEnd, stDev, stShape, rAmp, sDep, qWaveDep, morph, delta, invert, vtWide, qrsSign, qrsRAmp) {
+  const isTombstone = stShape === 'tombstone' && stDev > 0.08;
+  const isFlatDepression = (stShape === 'horizontal' || stShape === 'normal') && stDev < -0.08;
+  const effectiveS = isTombstone ? 0 : sDep;
+  let y = qrsSign * qrsComplex(t, qStart, qrs, qrsRAmp, effectiveS, qWaveDep, morph, delta, invert, vtWide);
+
+  if (isTombstone) {
+    const rPeakT = qStart + qrs * 0.38;
+    if (t >= rPeakT) {
+      const peakY = qrsSign * qrsComplex(rPeakT, qStart, qrs, qrsRAmp, effectiveS, qWaveDep, morph, delta, invert, vtWide);
+      const u = smoothstep((t - rPeakT) / Math.max(qrsEnd - rPeakT, 1));
+      y = smoothBlend(peakY, stDev, u);
+    }
+  } else if (isFlatDepression) {
+    const jStart = qStart + qrs * 0.50;
+    if (t >= jStart) {
+      const jY = qrsSign * qrsComplex(jStart, qStart, qrs, qrsRAmp, effectiveS, qWaveDep, morph, delta, invert, vtWide);
+      const u = smoothstep((t - jStart) / Math.max(qrsEnd - jStart, 1));
+      y = smoothBlend(jY, stDev, u);
+    }
+  } else if (Math.abs(stDev) > 0.04 && t >= qStart + qrs * 0.45) {
+    const tailStart = qStart + qrs * 0.45;
+    const blend = smoothstep((t - tailStart) / Math.max(qrsEnd - tailStart, 1));
+    y = smoothBlend(y, stDev, blend);
+  }
+  return y;
+}
+
+function sampleVentricular(t, qStart, qrs, qrsEnd, tCenter, tWidth, stDev, stShape, tAmp, tSym, peakedT,
+  rAmp, sDep, qWaveDep, morph, delta, invert, vtWide, qrsSign, qrsRAmp) {
+  if (t < qrsEnd) {
+    return qrsWithJunction(t, qStart, qrs, qrsEnd, stDev, stShape, rAmp, sDep, qWaveDep, morph, delta, invert, vtWide, qrsSign, qrsRAmp);
+  }
+  return stTComplex(t, qrsEnd, tCenter, tWidth, stDev, stShape, tAmp, tSym, peakedT);
+}
+
+function fibrillatoryBaseline(t, amp) {
+  if (!amp) return 0;
+  return ((hashNoise(t * 0.62) - 0.5) * 0.05 + (hashNoise(t * 1.43 + 17) - 0.5) * 0.03) * amp;
+}
+
+function flutterSawtooth(t, beatStart, amp) {
+  if (!amp) return 0;
+  const period = 200;
+  const phase = ((t - beatStart) % period) / period;
+  const tri = phase < 0.5 ? phase * 2 : 2 - phase * 2;
+  return -amp * (tri * 0.82 + Math.sin(phase * Math.PI * 2) * 0.08);
+}
+
+function pWaveContribution(t, pOnset, pDur, pAmp, morphology) {
+  if (!pAmp || morphology === 'absent') return 0;
+  const pEnd = pOnset + pDur;
+  if (morphology === 'biphasic') {
+    const mid = pOnset + pDur * 0.42;
+    return roundedWave(t, pOnset, mid - pDur * 0.06, mid + pDur * 0.08, pAmp * 0.62)
+      - roundedWave(t, mid, mid + pDur * 0.22, pEnd, pAmp * 0.42);
+  }
+  if (morphology === 'retrograde') return -roundedArc(t, pOnset, pEnd, Math.abs(pAmp));
+  return roundedArc(t, pOnset, pEnd, pAmp);
+}
+
+function generateBeat(params, lead, beatStart, rrInterval, leadOverride, beatCtx = {}) {
+  const lp = leadProjection(lead, params.qrsAxis);
+  const ov = leadOverride || {};
+  const invert = ov.invert ? -1 : 1;
+  const pAmp = (ov.pWaveAmplitude ?? params.pWaveAmplitude) * (lp.p || 0.5) * invert;
+  const rAmp = (ov.rWaveAmplitude ?? params.rWaveAmplitude) * (lp.r || 0.5) * invert;
+  const sDep = (ov.sWaveDepth ?? params.sWaveDepth) * (lp.s || 0.5);
+  const tAmp = (ov.tWaveAmplitude ?? params.tWaveAmplitude) * (lp.t || 0.5) * invert;
+  const stDev = ov.stDeviation ?? params.stDeviation;
+  const stShape = ov.stShape ?? params.stShape;
+  const qWaveDep = ov.qWaveDepth ?? (sDep * 0.35);
+  const morph = ov.morph || (params.qrsDuration >= 150 ? 'vt' : 'normal');
+  const flutterAmp = ov.flutterAmp ?? (params.flutterWaves ? 0.08 : 0);
+  const delta = ov.deltaWave ?? params.deltaWave;
+  const pMorph = ov.pWaveMorphology ?? params.pWaveMorphology;
+  const conductQrs = beatCtx.conductQrs !== false;
+  const showP = beatCtx.showP !== false;
+  const epsilon = beatCtx.epsilon === true;
+  const qrsSign = rAmp < 0 ? -1 : 1;
+  const qrsRAmp = Math.abs(rAmp);
+
+  const pr = beatCtx.prOverride ?? params.prInterval;
+  const qrs = params.qrsDuration;
+  const qt = params.qtInterval;
+  const pDur = params.pWaveDuration;
+  const pOnset = beatStart + 30;
+  const qStart = pOnset + pr;
+  const qrsEnd = qStart + qrs;
+  const tCenter = qStart + qt * 0.70;
+  const tWidth = qt * 0.20 * (1 + params.tWaveSymmetry * 0.35);
+  const uCenter = tCenter + qt * 0.20;
+  const end = beatStart + rrInterval;
+  const uWave = ov.uWave ?? params.uWave;
+  const jWave = ov.jWave ?? params.jWave;
+  const tSym = ov.tWaveSymmetry ?? params.tWaveSymmetry;
+  const peakedT = tSym >= 0.82 && Math.abs(tAmp) >= 0.45;
+  const vtWide = params.qrsDuration >= 140;
+  const pts = [];
+
+  const dt = params.fibrillatory > 0 ? 0.35 : 0.04;
+
+  for (let t = beatStart; t <= end + dt * 0.5; t += dt) {
+    let y = fibrillatoryBaseline(t, params.fibrillatory);
+
+    if (params.flutterWaves > 0) y += flutterSawtooth(t, beatStart, flutterAmp);
+
+    if (showP) y += pWaveContribution(t, pOnset, pDur, pAmp, pMorph);
+
+    if (conductQrs && t >= qStart - 10 && t <= tCenter + tWidth * 2) {
+      y += sampleVentricular(t, qStart, qrs, qrsEnd, tCenter, tWidth, stDev, stShape, tAmp, tSym, peakedT,
+        rAmp, sDep, qWaveDep, morph, delta, invert, vtWide, qrsSign, qrsRAmp);
+    }
+
+    if (epsilon && t >= qrsEnd - 1 && t <= qrsEnd + 28) {
+      y += softBump(t, qrsEnd + 12, 11, 0.06, false);
+    }
+
+    if (jWave > 0 && t >= qrsEnd - 1 && t <= qrsEnd + 40) {
+      y += roundedWave(t, qrsEnd + 2, qrsEnd + 14, qrsEnd + 38, jWave);
+    }
+
+    if (conductQrs && uWave > 0 && t >= uCenter - 20 && t <= uCenter + 50) {
+      y += roundedArc(t, uCenter - 18, uCenter + 32, uWave);
+    }
+
+    pts.push({ x: Math.min(t - beatStart, rrInterval), y });
+  }
+  return pts;
+}
+
+function appendPWaves(allPts, params, lead, leadOv, startMs, endMs, atrialRate) {
+  const atrialRR = 60000 / atrialRate;
+  const lp = leadProjection(lead, params.qrsAxis);
+  const invert = leadOv.invert ? -1 : 1;
+  const pMorph = leadOv.pWaveMorphology ?? params.pWaveMorphology;
+  const pAmp = (leadOv.pWaveAmplitude ?? params.pWaveAmplitude) * (lp.p || 0.5) * invert;
+  if (!pAmp || pMorph === 'absent') return;
+  const pDur = params.pWaveDuration;
+  let at = startMs + 20;
+  while (at < endMs) {
+    const pOnset = at;
+    for (let t = pOnset - 1; t <= pOnset + pDur + 1; t += 0.15) {
+      const y = pWaveContribution(t, pOnset, pDur, pAmp, pMorph);
+      if (y) allPts.push({ x: t, y });
+    }
+    at += atrialRR;
+  }
+}
+
+function mergeRhythmPoints(ventricularPts, atrialPts) {
+  const map = new Map();
+  const add = (p) => {
+    const key = Math.round(p.x * 20) / 20;
+    const prev = map.get(key);
+    map.set(key, prev == null ? p.y : prev + p.y);
+  };
+  ventricularPts.forEach(add);
+  atrialPts.forEach(add);
+  return [...map.entries()].sort((a, b) => a[0] - b[0]).map(([x, y]) => ({ x, y }));
+}
+
+function buildRhythmBeat(params, lead, leadOv, extras, beatIndex, rrBase) {
+  let rr = rrBase;
+  if (extras.irregular) rr = rrBase * (0.62 + beatRandom(beatIndex, 3) * 0.76);
+  if (extras.avRatio && params.flutterWaves) rr = 60000 / (300 / extras.avRatio);
+
+  const phase = beatIndex % 4;
+  const wenckebachDrop = extras.wenckebach && phase === 3;
+  const mobitz2Drop = extras.mobitz2 && phase === 3;
+  const beatCtx = {
+    prOverride: extras.wenckebach ? params.prInterval + phase * 55 : undefined,
+    conductQrs: !wenckebachDrop && !mobitz2Drop,
+    showP: params.pWaveMorphology !== 'absent' && !extras.avDissociation,
+    epsilon: extras.epsilon && ['V1', 'V2', 'V3'].includes(lead)
+  };
+  if (extras.wenckebach) rr = rrBase * (1 + phase * 0.06);
+  return { rr, beat: generateBeat(params, lead, 0, rr, leadOv, beatCtx) };
+}
+
+function getRhythmExtras(condition) {
+  return { ...(condition?.extras || {}), ...state.extras };
+}
+
+function beatFootprintMs(params) {
+  return params.qtInterval + params.qrsDuration * 0.12 + 35;
+}
+
+function minBeatIntervalMs(params, extras) {
+  const rrBase = 60000 / params.heartRate;
+  if (extras.irregular) return rrBase * 0.62;
+  if (extras.avRatio && params.flutterWaves) return 60000 / (300 / extras.avRatio);
+  return rrBase;
+}
+
+function rhythmBeatStepMs(rr, params, spread) {
+  if (!spread) return rr;
+  return Math.max(rr, beatFootprintMs(params) * 1.14);
+}
+
+function needsRhythmSpread(params, condition) {
+  return minBeatIntervalMs(params, getRhythmExtras(condition)) < beatFootprintMs(params) * 0.98;
+}
+
+function modalDurationMs(params, condition, w, pxPerMs) {
+  return w / pxPerMs + 400;
+}
+
+function buildRhythm(params, lead, durationMs, condition, options) {
+  const spread = !!options?.spreadOverlaps;
+  const allPts = [];
+  const leadOv = condition?.leadOverrides?.[lead] || {};
+  let t = 0;
+  let beatIndex = 0;
+  const extras = getRhythmExtras(condition);
+  const rrBase = 60000 / params.heartRate;
+
+  while (t < durationMs + rrBase) {
+    const { rr, beat } = buildRhythmBeat(params, lead, leadOv, extras, beatIndex, rrBase);
+    beat.forEach(p => allPts.push({ x: t + p.x, y: p.y }));
+    t += rhythmBeatStepMs(rr, params, spread);
+    beatIndex++;
+  }
+
+  if (extras.avDissociation) {
+    const atrialRate = Math.max(params.heartRate * 1.6, 72);
+    const atrialPts = [];
+    appendPWaves(atrialPts, params, lead, leadOv, 0, durationMs + rrBase, atrialRate);
+    return mergeRhythmPoints(allPts, atrialPts);
+  }
+  return allPts;
+}
+
+function buildRhythmLoop(params, lead, loopMs, condition, options) {
+  const spread = !!options?.spreadOverlaps;
+  const allPts = [];
+  const leadOv = condition?.leadOverrides?.[lead] || {};
+  let t = 0;
+  let beatIndex = 0;
+  const extras = getRhythmExtras(condition);
+  const rrBase = 60000 / params.heartRate;
+
+  while (t < loopMs) {
+    const { rr, beat } = buildRhythmBeat(params, lead, leadOv, extras, beatIndex, rrBase);
+    for (const p of beat) {
+      const absX = t + p.x;
+      if (absX <= loopMs) allPts.push({ x: absX, y: p.y });
+    }
+    t += rhythmBeatStepMs(rr, params, spread);
+    beatIndex++;
+  }
+
+  let pts = allPts;
+  if (extras.avDissociation) {
+    const atrialRate = Math.max(params.heartRate * 1.6, 72);
+    const atrialPts = [];
+    appendPWaves(atrialPts, params, lead, leadOv, 0, loopMs, atrialRate);
+    pts = mergeRhythmPoints(allPts, atrialPts);
+  }
+
+  if (!pts.length || pts[pts.length - 1].x < loopMs) {
+    pts.push({ x: loopMs, y: pts.length ? pts[pts.length - 1].y : 0 });
+  }
+  return pts;
+}
+
+function rhythmCacheKey(params, condition, lead, loopMs, options) {
+  return JSON.stringify({
+    lead, loopMs, id: state.conditionId,
+    p: params, m: state.metabolicLevels, e: state.extras,
+    spread: !!options?.spreadOverlaps,
+    pxPerMs: options?.pxPerMs ?? null
+  });
+}
+
+function getScrollingRhythm(params, condition, lead, msVisible, options) {
+  const spread = !!options?.spreadOverlaps;
+  const pxPerMs = options?.pxPerMs ?? renderMsToPxScale();
+  const loopMs = computeLoopMs(params, msVisible + 400, condition, spread);
+  const loopPx = loopMs * pxPerMs;
+  const key = rhythmCacheKey(params, condition, lead, loopMs, options);
+  const cacheRef = (spread || options?.pxPerMs != null) ? 'modalRhythmCache' : 'rhythmCache';
+  if (!state[cacheRef] || state[cacheRef].key !== key) {
+    state[cacheRef] = {
+      key,
+      loopMs,
+      loopPx,
+      points: buildRhythmLoop(params, lead, loopMs, condition, options)
+    };
+  }
+  return state[cacheRef];
+}
+
+function getEffectiveParams(baseParams, condition, extras) {
+  return applyMetabolicLevels(baseParams, state.metabolicLevels);
+}
+
+/* ============================================================
+   SECTION: Canvas Rendering
+   ============================================================ */
+function drawPaperGrid(ctx, w, h, scales) {
+  const g = scales?.pxPerMm ?? renderPxPerMm();
+  ctx.fillStyle = '#FFF5F5';
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = 'rgba(192,57,43,0.18)';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < w; x += g) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += g) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  ctx.strokeStyle = 'rgba(192,57,43,0.35)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < w; x += g * 5) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
+  for (let y = 0; y < h; y += g * 5) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+}
+
+function drawCalibration(ctx, x0, yMid, scales) {
+  const sz = scales?.mvToPx ?? renderMvToPxScale();
+  ctx.strokeStyle = TRACE_COLOR;
+  ctx.lineWidth = 2.25 * getContentScale() * (scales ? MODAL_MAGNIFY : 1);
+  ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  ctx.moveTo(x0, yMid); ctx.lineTo(x0, yMid - sz); ctx.lineTo(x0 + sz * 0.4, yMid - sz);
+  ctx.lineTo(x0 + sz * 0.4, yMid); ctx.stroke();
+}
+
+function dedupeSortedPoints(pts) {
+  if (pts.length < 2) return pts;
+  const out = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const prev = out[out.length - 1];
+    if (Math.abs(pts[i].x - prev.x) > 0.001) out.push(pts[i]);
+  }
+  return out;
+}
+
+function condenseTraceForDisplay(pts, colWidth = TRACE_CONDENSE_COL_PX) {
+  if (pts.length <= 2) return pts;
+  const buckets = new Map();
+  for (const p of pts) {
+    const key = Math.round(p.x / colWidth);
+    let bucket = buckets.get(key);
+    if (!bucket) buckets.set(key, bucket = { pts: [p] });
+    else bucket.pts.push(p);
+  }
+  const out = [];
+  for (const key of [...buckets.keys()].sort((a, b) => a - b)) {
+    const bucket = buckets.get(key);
+    if (bucket.pts.length === 1) {
+      out.push(bucket.pts[0]);
+      continue;
+    }
+    let minP = bucket.pts[0];
+    let maxP = bucket.pts[0];
+    for (const p of bucket.pts) {
+      if (p.y < minP.y) minP = p;
+      if (p.y > maxP.y) maxP = p;
+    }
+    if (minP === maxP) out.push(minP);
+    else if (minP.x <= maxP.x) {
+      out.push(minP);
+      out.push(maxP);
+    } else {
+      out.push(maxP);
+      out.push(minP);
+    }
+  }
+  return out.length >= 2 ? out : pts;
+}
+
+function adaptiveTraceLineWidth(pts, isRhythm) {
+  const base = isRhythm ? RHYTHM_LINE_WIDTH : TRACE_LINE_WIDTH;
+  if (pts.length < 2) return base;
+  let minDx = Infinity;
+  for (let i = 1; i < pts.length; i++) {
+    const dx = Math.abs(pts[i].x - pts[i - 1].x);
+    if (dx > 0.0001) minDx = Math.min(minDx, dx);
+  }
+  if (!isFinite(minDx)) return base;
+  const densityScale = Math.min(1, Math.max(0.4, minDx / 3));
+  const countScale = pts.length > 500 ? Math.max(0.45, 500 / pts.length) : 1;
+  return Math.max(TRACE_MIN_LINE_WIDTH, base * densityScale * countScale);
+}
+
+function strokeEcgTrace(ctx, pts, smooth) {
+  if (pts.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  if (!smooth || pts.length === 2) {
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+    return;
+  }
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+  ctx.stroke();
+}
+
+function drawTrace(ctx, points, w, h, scrollOffset, loopMs, yAtOverride, isRhythm, scales) {
+  if (points.length < 2) return;
+  const msToPx = scales?.msToPx ?? renderMsToPxScale();
+  const mvToPx = scales?.mvToPx ?? renderMvToPxScale();
+  const yAt = yAtOverride || buildYMapper(points, h, mvToPx);
+  const offset = scrollOffset || 0;
+  let visible = [];
+
+  if (loopMs && loopMs > 0) {
+    for (const p of points) {
+      if (p.x > loopMs) continue;
+      for (const k of [-1, 0, 1]) {
+        const x = (p.x + k * loopMs) * msToPx - offset;
+        if (x >= -10 && x <= w + 10) visible.push({ x, y: yAt(p.y) });
+      }
+    }
+    visible.sort((a, b) => a.x - b.x);
+    visible = dedupeSortedPoints(visible);
+  } else {
+    for (const p of points) {
+      const x = p.x * msToPx - offset;
+      if (x >= -10 && x <= w + 10) visible.push({ x, y: yAt(p.y) });
+    }
+  }
+
+  if (visible.length < 2) return;
+  const rhythm = !!isRhythm;
+  const dense = visible.length > 180;
+  const plotPts = dense ? condenseTraceForDisplay(visible) : visible;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.strokeStyle = TRACE_COLOR;
+  ctx.lineWidth = adaptiveTraceLineWidth(plotPts, rhythm);
+  ctx.lineJoin = dense ? 'miter' : 'round';
+  ctx.lineCap = dense ? 'butt' : 'round';
+  ctx.miterLimit = 2;
+  strokeEcgTrace(ctx, plotPts, !dense && plotPts.length < 120);
+}
+
+function renderLeadCanvas(canvas, lead, params, condition, scrollOffset, durationSec, sharedExtents) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.parentElement.getBoundingClientRect();
+  const w = rect.width, h = rect.height;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  drawPaperGrid(ctx, w, h);
+  const dur = (durationSec != null ? durationSec : displaySecForWidth(w)) * 1000;
+  const pts = buildRhythm(params, lead, dur, condition);
+  const mvToPx = renderMvToPxScale();
+  const yAt = sharedExtents
+    ? buildYMapperFromExtents(sharedExtents.peak, sharedExtents.trough, h, mvToPx)
+    : buildYMapper(pts, h, mvToPx);
+  drawCalibration(ctx, 8, yAt(0));
+  drawTrace(ctx, pts, w, h, scrollOffset, 0, yAt, false);
+}
+
+/* ============================================================
+   SECTION: Application State & UI
+   ============================================================ */
+const state = {
+  conditionBaseParams: { ...NORMAL },
+  targetBaseParams: { ...NORMAL },
+  metabolicLevels: defaultMetabolicLevels(),
+  conditionId: 'normal',
+  conditionModified: false,
+  extras: { avRatio: 2 },
+  interpStart: null,
+  interpFrom: null,
+  scrollOffset: 0,
+  lastFrame: 0,
+  leadCanvases: {},
+  needsStaticRedraw: true,
+  modal: { open: false, lead: 'I', isRhythm: false },
+  modalResizeObserver: null,
+  rhythmCache: null,
+  modalRhythmCache: null
+};
+
+function lerpParams(from, to, t) {
+  const r = { ...to };
+  for (const k of Object.keys(to)) {
+    if (typeof to[k] === 'number' && typeof from[k] === 'number') r[k] = from[k] + (to[k] - from[k]) * t;
+    else if (typeof to[k] === 'string') r[k] = t >= 1 ? to[k] : from[k];
+  }
+  return r;
+}
+
+function getBaseParams() {
+  if (state.interpStart !== null) {
+    const elapsed = performance.now() - state.interpStart;
+    const t = Math.min(1, elapsed / 300);
+    const eased = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+    if (t >= 1) { state.interpStart = null; state.conditionBaseParams = { ...state.targetBaseParams }; }
+    else return lerpParams(state.interpFrom, state.targetBaseParams, eased);
+  }
+  return state.conditionBaseParams;
+}
+
+function getCurrentParams() {
+  return getEffectiveParams(getBaseParams(), getCondition(), state.extras);
+}
+
+function getCondition() { return CONDITIONS.find(c => c.id === state.conditionId) || CONDITIONS[0]; }
+
+function scheduleRedraw() {
+  state.needsStaticRedraw = true;
+  state.rhythmCache = null;
+  state.modalRhythmCache = null;
+}
+
+function formatLabValue(def, val) {
+  return val.toFixed(def.decimals);
+}
+
+function labStatus(def, val) {
+  const n = def.normal, tol = def.key === 'ph' ? 0.03 : n * 0.08;
+  if (Math.abs(val - n) <= tol) return '';
+  if (def.key === 'potassium' && (val > 6.5 || val < 2.8)) return 'critical';
+  if (def.key === 'ph' && (val < 7.2 || val > 7.55)) return 'critical';
+  return 'abnormal';
+}
+
+function buildLabControl(def, container) {
+  const row = document.createElement('div');
+  row.className = 'metabolic-row';
+  row.dataset.key = def.key;
+  const unitStr = def.unit ? ` ${def.unit}` : '';
+  row.innerHTML = `
+    <div class="metabolic-info">
+      <span class="metabolic-name">${def.label}</span>
+      <span class="metabolic-normal">Normal: <span>${formatLabValue(def, def.normal)}${unitStr}</span></span>
+    </div>
+    <div class="metabolic-stepper">
+      <button type="button" class="step-btn" data-action="minus" aria-label="Decrease">−</button>
+      <div>
+        <div class="metabolic-val" id="lab-val-${def.key}"></div>
+        <div class="metabolic-unit">${def.unit || ''}</div>
+      </div>
+      <button type="button" class="step-btn" data-action="plus" aria-label="Increase">+</button>
+      <button type="button" class="step-btn step-reset" data-action="reset" title="Reset to normal" aria-label="Reset to normal">↺</button>
+    </div>`;
+  container.appendChild(row);
+  row.querySelector('[data-action="minus"]').onclick = () => adjustLab(def.key, -def.step);
+  row.querySelector('[data-action="plus"]').onclick = () => adjustLab(def.key, def.step);
+  row.querySelector('[data-action="reset"]').onclick = () => resetLab(def.key);
+}
+
+function buildLabControls() {
+  const elContainer = document.getElementById('electrolyte-controls');
+  const metContainer = document.getElementById('metabolite-controls');
+  ELECTROLYTES.forEach(d => buildLabControl(d, elContainer));
+  METABOLITES.forEach(d => buildLabControl(d, metContainer));
+  document.querySelectorAll('.sub-header').forEach(h => {
+    h.onclick = e => {
+      if (e.target.closest('.btn-reset')) return;
+      h.nextElementSibling.classList.toggle('open');
+    };
+  });
+  document.querySelectorAll('[data-reset-group]').forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      resetLabGroup(btn.dataset.resetGroup);
+    };
+  });
+}
+
+function updateLabUI() {
+  ECG_LAB_DEFS.forEach(def => {
+    const val = state.metabolicLevels[def.key];
+    const el = document.getElementById(`lab-val-${def.key}`);
+    if (!el) return;
+    el.textContent = formatLabValue(def, val);
+    el.className = 'metabolic-val ' + labStatus(def, val);
+  });
+  updateConditionDisplay();
+}
+
+function adjustLab(key, delta) {
+  const def = ECG_LAB_DEFS.find(d => d.key === key);
+  if (!def) return;
+  let val = state.metabolicLevels[key] + delta;
+  val = Math.round(Math.max(def.min, Math.min(def.max, val)) / def.step) * def.step;
+  val = parseFloat(val.toFixed(def.decimals));
+  state.metabolicLevels[key] = val;
+  afterLabChange();
+}
+
+function resetLab(key) {
+  const def = ECG_LAB_DEFS.find(d => d.key === key);
+  if (!def) return;
+  state.metabolicLevels[key] = def.normal;
+  afterLabChange();
+}
+
+function resetLabGroup(group) {
+  const defs = group === 'electrolytes' ? ELECTROLYTES : METABOLITES;
+  defs.forEach(def => { state.metabolicLevels[def.key] = def.normal; });
+  afterLabChange();
+}
+
+function afterLabChange() {
+  state.conditionModified = !labsAreNormal(state.metabolicLevels);
+  updateLabUI();
+  updateConditionLabels();
+  scheduleRedraw();
+}
+
+function resetLabs() {
+  applyConditionLabs(state.conditionId);
+  updateConditionLabels();
+  scheduleRedraw();
+}
+
+function updateConditionDisplay() {
+  const c = getCondition();
+  const el = document.getElementById('current-condition');
+  if (!el) return;
+  const mod = state.conditionModified ? ' <em style="color:var(--amber)">(Labs Modified)</em>' : '';
+  const profile = CONDITION_LAB_PROFILES[c.id];
+  const labNote = profile
+    ? ' Lab values below match this condition; adjust to layer additional ECG effects.'
+    : ' Lab values are normal; adjust to simulate electrolyte or metabolic ECG changes.';
+  el.innerHTML = `<strong>${c.name}${mod}</strong>${labNote}`;
+}
+
+function markModified() {
+  state.conditionModified = !labsAreNormal(state.metabolicLevels);
+  updateConditionLabels();
+  updateConditionDisplay();
+}
+
+function buildConditions() {
+  const container = document.getElementById('condition-groups');
+  Object.entries(CONDITION_CATEGORIES).forEach(([catId, catLabel]) => {
+    const items = CONDITIONS.filter(c => c.category === catId);
+    const div = document.createElement('div');
+    div.className = 'condition-group';
+    div.innerHTML = `<div class="condition-group-title">${catLabel}<span>▼</span></div><div class="condition-list"></div>`;
+    const list = div.querySelector('.condition-list');
+    items.forEach(c => {
+      const el = document.createElement('div');
+      el.className = 'condition-item' + (c.id === state.conditionId ? ' active' : '');
+      el.dataset.id = c.id;
+      el.textContent = c.name;
+      el.onclick = () => selectCondition(c.id);
+      list.appendChild(el);
+    });
+    div.querySelector('.condition-group-title').onclick = () => list.classList.toggle('open');
+    list.classList.add('open');
+    container.appendChild(div);
+  });
+  addExtraControls();
+}
+
+function addExtraControls() {
+  const sec = document.getElementById('conditions-section');
+  let extra = document.getElementById('extra-controls');
+  if (!extra) {
+    extra = document.createElement('div');
+    extra.id = 'extra-controls';
+    extra.className = 'extra-control';
+    sec.appendChild(extra);
+  }
+  extra.innerHTML = `<div id="flutter-ctrl" style="display:none"><label>AV Block Ratio (Flutter)</label>
+    <select id="av-ratio"><option value="2">2:1</option><option value="3">3:1</option><option value="4">4:1</option></select></div>`;
+  document.getElementById('av-ratio').onchange = e => { state.extras.avRatio = +e.target.value; scheduleRedraw(); };
+}
+
+function updateExtraControls() {
+  const c = getCondition();
+  document.getElementById('flutter-ctrl').style.display = c.id === 'aflutter' ? 'block' : 'none';
+}
+
+function selectCondition(id) {
+  const c = CONDITIONS.find(x => x.id === id);
+  if (!c) return;
+  state.conditionId = id;
+  applyConditionLabs(id);
+  state.interpFrom = { ...getBaseParams() };
+  state.targetBaseParams = { ...c.params };
+  state.interpStart = performance.now();
+  updateConditionLabels();
+  updateExtraControls();
+  showEducation(id);
+  showTreatment(id);
+  closeMobileSidebar();
+  scheduleRedraw();
+}
+
+function updateConditionLabels() {
+  document.querySelectorAll('.condition-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === state.conditionId);
+    el.classList.toggle('modified', el.dataset.id === state.conditionId && state.conditionModified);
+  });
+}
+
+function buildEcgGrid() {
+  const grid = document.getElementById('ecg-grid');
+  LEAD_ORDER.forEach(lead => {
+    const cell = document.createElement('div');
+    cell.className = 'lead-cell';
+    cell.dataset.lead = lead;
+    cell.title = 'Click to enlarge';
+    cell.innerHTML = `<span class="lead-label">${lead}</span><canvas></canvas>`;
+    cell.onclick = () => openMagnify(lead);
+    grid.appendChild(cell);
+    state.leadCanvases[lead] = cell.querySelector('canvas');
+  });
+  document.getElementById('rhythm-section').onclick = () => openMagnify('II', true);
+}
+
+function renderAllStatic() {
+  const cond = getCondition();
+  const params = getCurrentParams();
+  const extents = computeGlobalExtents(params, cond);
+  LEAD_ORDER.forEach(lead => {
+    const canvas = state.leadCanvases[lead];
+    if (canvas) renderLeadCanvas(canvas, lead, params, cond, 0, null, extents);
+  });
+  state.needsStaticRedraw = false;
+}
+
+function showEducation(id) {
+  const edu = EDUCATION[id];
+  const overview = document.getElementById('theory-overview');
+  const findings = document.getElementById('theory-findings');
+  const patho = document.getElementById('theory-pathophysiology');
+  const criteria = document.getElementById('theory-criteria');
+  if (!edu) {
+    [overview, findings, patho, criteria].forEach(el => { if (el) el.innerHTML = ''; });
+    return;
+  }
+  const c = getCondition();
+  overview.innerHTML = `<h3>${c.name}</h3><p>${edu.overview}</p>`;
+  findings.innerHTML = `<h3>ECG Findings</h3><ul>${edu.findings.map(f => `<li>${f}</li>`).join('')}</ul>`;
+  patho.innerHTML = `<h3>Pathophysiology</h3><p>${edu.pathophysiology}</p>`;
+  criteria.innerHTML = `<h3>Diagnostic Criteria & Pearls</h3><ul>${edu.criteria.map(f => `<li>${f}</li>`).join('')}</ul>`;
+}
+
+const TREATMENT_URGENCY_LABELS = {
+  emergent: 'Emergent',
+  urgent: 'Urgent',
+  routine: 'Routine',
+  supportive: 'Supportive / None required'
+};
+
+function showTreatment(id) {
+  const tx = TREATMENT[id];
+  const condEl = document.getElementById('treatment-condition');
+  const contentEl = document.getElementById('treatment-content');
+  if (!condEl || !contentEl) return;
+  const c = CONDITIONS.find(x => x.id === id) || CONDITIONS[0];
+  if (!tx) {
+    condEl.innerHTML = `<strong>${c.name}</strong>No specific treatment pathway defined.`;
+    contentEl.innerHTML = '';
+    return;
+  }
+  const urgencyLabel = TREATMENT_URGENCY_LABELS[tx.urgency] || tx.urgency;
+  condEl.innerHTML = `<strong>${c.name}</strong>Recommended management steps for this ECG pattern.`;
+  contentEl.innerHTML = `
+    <span class="treatment-urgency ${tx.urgency}">${urgencyLabel}</span>
+    <ol class="treatment-steps">${tx.steps.map(s => `<li>${s}</li>`).join('')}</ol>
+    ${tx.note ? `<p class="treatment-note">${tx.note}</p>` : ''}`;
+}
+
+function openMagnify(lead, isRhythm) {
+  const overlay = document.getElementById('overlay');
+  const cond = getCondition();
+  const params = getCurrentParams();
+  const title = isRhythm ? 'Lead II — Rhythm Strip (Enlarged)' : `Lead ${lead}`;
+  const spreadNote = needsRhythmSpread(params, cond) ? ' · Beats spread for clarity' : '';
+  document.getElementById('overlay-title').textContent = title;
+  document.getElementById('overlay-sub').textContent = `${cond.name} · 25 mm/sec · 10 mm/mV${spreadNote} · Click outside to close`;
+  document.getElementById('modal-beam').classList.toggle('visible', !!isRhythm);
+  state.modal = { open: true, lead, isRhythm: !!isRhythm };
+  overlay.classList.add('open');
+  requestAnimationFrame(() => {
+    updateModalMeasurements();
+    renderModalCanvas();
+    if (window.ResizeObserver && !state.modalResizeObserver) {
+      const wrap = document.querySelector('.magnify-wrap');
+      state.modalResizeObserver = new ResizeObserver(() => {
+        if (state.modal.open) renderModalCanvas();
+      });
+      state.modalResizeObserver.observe(wrap);
+    }
+  });
+}
+
+function closeOverlay() {
+  document.getElementById('overlay').classList.remove('open');
+  state.modal.open = false;
+  document.getElementById('modal-beam').classList.remove('visible');
+}
+
+function updateModalMeasurements() {
+  const p = getCurrentParams();
+  document.getElementById('measure-labels').innerHTML =
+    `<p><strong>PR:</strong> ${Math.round(p.prInterval)} ms &nbsp; <strong>QRS:</strong> ${Math.round(p.qrsDuration)} ms &nbsp;
+     <strong>QT:</strong> ${Math.round(p.qtInterval)} ms &nbsp; <strong>R-R:</strong> ${Math.round(60000 / p.heartRate)} ms &nbsp;
+     <strong>Rate:</strong> ${Math.round(p.heartRate)} bpm</p>`;
+}
+
+function renderModalCanvas() {
+  if (!state.modal.open) return;
+  const wrap = document.querySelector('.magnify-wrap');
+  const canvas = document.getElementById('magnify-canvas');
+  if (!wrap || !canvas) return;
+  const w = wrap.clientWidth;
+  const h = wrap.clientHeight;
+  if (w <= 0 || h <= 0) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const scales = getModalRenderScale();
+  drawPaperGrid(ctx, w, h, scales);
+  const cond = getCondition();
+  const params = getCurrentParams();
+  const pxPerMs = scales.msToPx;
+  const msVisible = w / pxPerMs;
+  const modalSpread = { spreadOverlaps: needsRhythmSpread(params, cond), pxPerMs };
+  if (state.modal.isRhythm) {
+    const rhythm = getScrollingRhythm(params, cond, state.modal.lead, msVisible, modalSpread);
+    const yAt = buildYMapper(rhythm.points, h, scales.mvToPx);
+    drawCalibration(ctx, 12, yAt(0), scales);
+    drawTrace(ctx, rhythm.points, w, h, state.scrollOffset % rhythm.loopPx, rhythm.loopMs, yAt, true, scales);
+  } else {
+    const durationMs = modalDurationMs(params, cond, w, pxPerMs);
+    const pts = buildRhythm(params, state.modal.lead, durationMs, cond, modalSpread);
+    const yAt = buildYMapper(pts, h, scales.mvToPx);
+    drawCalibration(ctx, 12, yAt(0), scales);
+    drawTrace(ctx, pts, w, h, 0, 0, yAt, false, scales);
+  }
+}
+
+function animateRhythmStrip(ts) {
+  if (!state.lastFrame) state.lastFrame = ts;
+  const dt = ts - state.lastFrame;
+  state.lastFrame = ts;
+  const pxPerMs = renderMsToPxScale();
+  state.scrollOffset += dt * pxPerMs * RHYTHM_SCROLL_FACTOR;
+
+  if (state.needsStaticRedraw || state.interpStart !== null) {
+    renderAllStatic();
+    updateLabUI();
+  }
+
+  const canvas = document.getElementById('rhythm-canvas');
+  const section = document.getElementById('rhythm-section');
+  const dpr = window.devicePixelRatio || 1;
+  const w = section.clientWidth, h = section.clientHeight;
+  if (w > 0 && h > 0) {
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    drawPaperGrid(ctx, w, h);
+    const cond = getCondition();
+    const params = getCurrentParams();
+    const msVisible = w / pxPerMs;
+    const rhythm = getScrollingRhythm(params, cond, 'II', msVisible);
+    const yAt = buildYMapper(rhythm.points, h, renderMvToPxScale());
+    drawCalibration(ctx, 8, yAt(0));
+    drawTrace(ctx, rhythm.points, w, h, state.scrollOffset % rhythm.loopPx, rhythm.loopMs, yAt, true);
+  }
+
+  if (state.modal.open) {
+    if (state.needsStaticRedraw || state.interpStart !== null) updateModalMeasurements();
+    renderModalCanvas();
+  }
+
+  requestAnimationFrame(animateRhythmStrip);
+}
+
+function qrsEndFromParams(params) {
+  return 30 + params.prInterval + params.qrsDuration;
+}
+
+function stSegmentWindow(beat, qrsEndX) {
+  return beat.filter(p => p.x >= qrsEndX + 4 && p.x <= qrsEndX + 75);
+}
+
+function firstBeatWindow(pts, rrMs) {
+  return pts.filter(p => p.x >= 20 && p.x <= rrMs - 10);
+}
+
+function validateMorphology() {
+  const checks = [
+    { id:'stemi-inferior', lead:'III', stMin:0.35, stExpect:'elevated' },
+    { id:'stemi-inferior', lead:'II', stMin:0.22, stExpect:'elevated' },
+    { id:'stemi-inferior', lead:'aVF', stMin:0.26, stExpect:'elevated' },
+    { id:'stemi-inferior', lead:'aVL', stMax:-0.14, stExpect:'depressed' },
+    { id:'stemi-anterior', lead:'V2', stMin:0.30, stExpect:'elevated' },
+    { id:'nstemi', lead:'V5', stMax:-0.08, stExpect:'depressed' },
+    { id:'normal', lead:'II', stBand:[-0.03,0.03], stExpect:'isoelectric' },
+    { id:'pericarditis', lead:'II', stMin:0.08, stExpect:'elevated' },
+    { id:'hyperkalemia', lead:'V3', tMin:0.5, stExpect:'peaked_t' }
+  ];
+  const failures = [];
+  checks.forEach(ch => {
+    const cond = CONDITIONS.find(c => c.id === ch.id);
+    if (!cond) return;
+    const params = { ...cond.params };
+    const rrMs = 60000 / params.heartRate;
+    const qrsEndX = qrsEndFromParams(params);
+    const pts = buildRhythm(params, ch.lead, rrMs + 80, cond);
+    const beat = firstBeatWindow(pts, rrMs);
+    if (!beat.length) { failures.push(ch.id + '/' + ch.lead + ': no samples'); return; }
+    let peak = -Infinity;
+    beat.forEach(p => { if (p.y > peak) peak = p.y; });
+    const stRegion = stSegmentWindow(beat, qrsEndX);
+    if (!stRegion.length) { failures.push(ch.id + '/' + ch.lead + ': no ST region'); return; }
+    const stVals = stRegion.map(p => p.y);
+    const stMin = Math.min(...stVals), stMax = Math.max(...stVals);
+    if (ch.stExpect === 'elevated' && stMin < (ch.stMin || 0.1)) {
+      failures.push(ch.id + '/' + ch.lead + ': ST min ' + stMin.toFixed(3) + ' < ' + ch.stMin + ' (touches baseline)');
+    }
+    if (ch.stExpect === 'depressed' && stMax > (ch.stMax || -0.05)) {
+      failures.push(ch.id + '/' + ch.lead + ': ST max ' + stMax.toFixed(3) + ' not depressed enough');
+    }
+    if (ch.stExpect === 'isoelectric' && (stMin < ch.stBand[0] || stMax > ch.stBand[1])) {
+      failures.push(ch.id + '/' + ch.lead + ': ST not isoelectric [' + stMin.toFixed(3) + ',' + stMax.toFixed(3) + ']');
+    }
+    if (ch.stExpect === 'peaked_t' && peak < ch.tMin) {
+      failures.push(ch.id + '/' + ch.lead + ': T peak ' + peak.toFixed(3) + ' too low');
+    }
+  });
+  if (failures.length) console.warn('[ECG Morphology]', failures);
+  else console.info('[ECG Morphology] All validation checks passed.');
+  return failures;
+}
+
+function init() {
+  initSidebar();
+  buildLabControls();
+  buildConditions();
+  buildEcgGrid();
+  updateLabUI();
+  showEducation('normal');
+  showTreatment('normal');
+  updateExtraControls();
+  validateMorphology();
+
+  document.getElementById('reset-labs-btn').onclick = resetLabs;
+  document.getElementById('print-btn').onclick = () => window.print();
+  document.getElementById('overlay-close').onclick = closeOverlay;
+  document.getElementById('overlay').onclick = e => { if (e.target.id === 'overlay') closeOverlay(); };
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (state.modal.open) closeOverlay();
+    else closeMobileSidebar();
+  });
+
+  window.addEventListener('resize', () => { updateLayoutVars(); scheduleRedraw(); });
+  const gridEl = document.getElementById('ecg-grid');
+  const rhythmEl = document.getElementById('rhythm-section');
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => scheduleRedraw());
+    ro.observe(gridEl);
+    ro.observe(rhythmEl);
+  }
+  updateLayoutVars();
+  renderAllStatic();
+  requestAnimationFrame(animateRhythmStrip);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
