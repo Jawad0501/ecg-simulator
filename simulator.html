@@ -100,6 +100,7 @@ select{font-family:'Source Sans 3',sans-serif;font-size:.78rem;padding:4px 6px;b
 .calibration-bar{display:flex;justify-content:space-between;align-items:center;font-size:.72rem;color:var(--grey);flex-shrink:0;padding:0 2px;gap:10px}
 .calibration-bar-left{display:flex;align-items:center;gap:10px;min-width:0}
 .calibration-bar-left span{white-space:nowrap}
+.grid-legend{font-size:.68rem;color:var(--grey)}
 .calibration-bar .tools{display:flex;gap:8px}
 .ecg-grid{display:grid;grid-template-columns:repeat(var(--ecg-cols),minmax(0,1fr));grid-template-rows:repeat(var(--ecg-rows),minmax(0,1fr));gap:6px;width:100%;flex:1;min-height:0}
 .lead-cell{position:relative;border:1px solid #D4A0A0;background:var(--paper);overflow:hidden;cursor:pointer;height:100%;min-height:0;width:100%;transition:box-shadow .15s,border-color .15s}
@@ -134,6 +135,7 @@ select{font-family:'Source Sans 3',sans-serif;font-size:.78rem;padding:4px 6px;b
 .treatment-steps{margin:8px 0 0 18px}
 .treatment-steps li{margin-bottom:6px}
 .treatment-note{font-size:.72rem;color:var(--grey);margin-top:10px;padding-top:8px;border-top:1px solid #F0EEEA}
+.theory-note{font-size:.72rem;color:var(--grey);margin-top:8px;padding-top:8px;border-top:1px solid #F0EEEA}
 .labs-hint{font-size:.72rem;color:var(--grey);margin-bottom:10px;line-height:1.45}
 .sidebar-backdrop{display:none}
 .ecg-scroll-hint{display:none;font-size:.68rem;color:var(--grey);text-align:center;padding:2px 0 4px}
@@ -276,9 +278,38 @@ select{font-family:'Source Sans 3',sans-serif;font-size:.78rem;padding:4px 6px;b
             </button>
             <div class="accordion-body">
               <div id="theory-sections">
-                <div class="theory-item open" data-theory="overview">
-                  <button type="button" class="theory-header active">Overview <span class="theory-chevron">▼</span></button>
-                  <div class="theory-body open" id="theory-overview"></div>
+                <div class="theory-item open" data-theory="reading">
+                  <button type="button" class="theory-header active">Reading the ECG <span class="theory-chevron">▼</span></button>
+                  <div class="theory-body open" id="theory-reading">
+                    <h3>What an ECG Measures</h3>
+                    <p>Surface electrodes record the heart&rsquo;s electrical activity as voltage (mV) over time (seconds). Depolarisation produces upward deflections; repolarisation follows as the ST segment and T wave.</p>
+                    <h3>Waveform Components</h3>
+                    <ul>
+                      <li><strong>P wave</strong> &mdash; atrial depolarisation (normal 60&ndash;120&nbsp;ms)</li>
+                      <li><strong>PR interval</strong> &mdash; atrial to ventricular conduction (120&ndash;200&nbsp;ms)</li>
+                      <li><strong>QRS complex</strong> &mdash; ventricular depolarisation (normal &lt;120&nbsp;ms; wide if &gt;120&nbsp;ms)</li>
+                      <li><strong>ST segment</strong> &mdash; between ventricular depolarisation and repolarisation</li>
+                      <li><strong>T wave</strong> &mdash; ventricular repolarisation</li>
+                    </ul>
+                    <h3>Grid &amp; Axes (25&nbsp;mm/s, 10&nbsp;mm/mV)</h3>
+                    <ul>
+                      <li><strong>Horizontal (time):</strong> each small square = 0.04&nbsp;s; each large square = <strong>0.2&nbsp;s</strong> (bottom axis labels)</li>
+                      <li><strong>Vertical (voltage):</strong> each small square = 0.1&nbsp;mV; each large square = <strong>0.5&nbsp;mV</strong> (left axis labels)</li>
+                      <li><strong>Calibration pulse:</strong> 1&nbsp;mV tall, 0.2&nbsp;s wide at the left of each trace</li>
+                    </ul>
+                    <h3>Heart Rate (use R-wave peaks)</h3>
+                    <ul>
+                      <li><strong>1500 rule (regular):</strong> count small squares between consecutive R peaks &mdash; rate = 1500 &divide; small squares (most precise)</li>
+                      <li><strong>300 rule (regular):</strong> count large squares between R peaks &mdash; rate = 300 &divide; large squares (quick estimate; best when R-R lands on whole squares)</li>
+                      <li><strong>6-second strip (irregular):</strong> count R waves in 6&nbsp;s (30 large squares) and multiply by 10</li>
+                    </ul>
+                    <p class="theory-note">This simulator spaces R peaks to match the displayed rate on the calibrated grid. At fast rates, QT shortens automatically so T waves do not mimic extra R peaks.</p>
+                    <p class="theory-note">Tap any lead to enlarge with full time (s) and voltage (mV) axes. Interval values (PR, QRS, QT) appear below the magnified view.</p>
+                  </div>
+                </div>
+                <div class="theory-item" data-theory="overview">
+                  <button type="button" class="theory-header">Overview <span class="theory-chevron">▼</span></button>
+                  <div class="theory-body" id="theory-overview"></div>
                 </div>
                 <div class="theory-item" data-theory="findings">
                   <button type="button" class="theory-header">ECG Findings <span class="theory-chevron">▼</span></button>
@@ -311,7 +342,8 @@ select{font-family:'Source Sans 3',sans-serif;font-size:.78rem;padding:4px 6px;b
         <div class="calibration-bar">
           <div class="calibration-bar-left">
             <button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar" aria-expanded="true">◀</button>
-            <span>25 mm/sec &nbsp;|&nbsp; 10 mm/mV</span>
+            <span>25 mm/s &nbsp;|&nbsp; 10 mm/mV</span>
+            <span class="grid-legend">□ 0.2 s &nbsp;·&nbsp; 0.5 mV</span>
           </div>
           <div class="tools">
             <button class="btn" id="print-btn">Print ECG</button>
@@ -1199,7 +1231,7 @@ function generateBeat(params, lead, beatStart, rrInterval, leadOverride, beatCtx
 
   const pr = beatCtx.prOverride ?? params.prInterval;
   const qrs = params.qrsDuration;
-  const qt = params.qtInterval;
+  const qt = effectiveQtForRate(params, rrInterval);
   const pDur = params.pWaveDuration;
   const pOnset = beatStart + 30;
   const qStart = pOnset + pr;
@@ -1208,6 +1240,7 @@ function generateBeat(params, lead, beatStart, rrInterval, leadOverride, beatCtx
   const tWidth = qt * 0.20 * (1 + params.tWaveSymmetry * 0.35);
   const uCenter = tCenter + qt * 0.20;
   const end = beatStart + rrInterval;
+  const traceEnd = end;
   const uWave = ov.uWave ?? params.uWave;
   const jWave = ov.jWave ?? params.jWave;
   const tSym = ov.tWaveSymmetry ?? params.tWaveSymmetry;
@@ -1217,14 +1250,14 @@ function generateBeat(params, lead, beatStart, rrInterval, leadOverride, beatCtx
 
   const dt = params.fibrillatory > 0 ? 0.35 : 0.04;
 
-  for (let t = beatStart; t <= end + dt * 0.5; t += dt) {
+  for (let t = beatStart; t <= end; t += dt) {
     let y = fibrillatoryBaseline(t, params.fibrillatory);
 
     if (params.flutterWaves > 0) y += flutterSawtooth(t, beatStart, flutterAmp);
 
     if (showP) y += pWaveContribution(t, pOnset, pDur, pAmp, pMorph);
 
-    if (conductQrs && t >= qStart - 10 && t <= tCenter + tWidth * 2) {
+    if (conductQrs && t >= qStart - 10 && t <= traceEnd) {
       y += sampleVentricular(t, qStart, qrs, qrsEnd, tCenter, tWidth, stDev, stShape, tAmp, tSym, peakedT,
         rAmp, sDep, qWaveDep, morph, delta, invert, vtWide, qrsSign, qrsRAmp);
     }
@@ -1237,11 +1270,11 @@ function generateBeat(params, lead, beatStart, rrInterval, leadOverride, beatCtx
       y += roundedWave(t, qrsEnd + 2, qrsEnd + 14, qrsEnd + 38, jWave);
     }
 
-    if (conductQrs && uWave > 0 && t >= uCenter - 20 && t <= uCenter + 50) {
+    if (conductQrs && uWave > 0 && t >= uCenter - 20 && t <= Math.min(uCenter + 50, traceEnd)) {
       y += roundedArc(t, uCenter - 18, uCenter + 32, uWave);
     }
 
-    pts.push({ x: Math.min(t - beatStart, rrInterval), y });
+    pts.push({ x: t - beatStart, y });
   }
   return pts;
 }
@@ -1301,6 +1334,25 @@ function getRhythmExtras(condition) {
 
 function beatFootprintMs(params) {
   return params.qtInterval + params.qrsDuration * 0.12 + 35;
+}
+
+function effectiveQtForRate(params, rrMs) {
+  const qrsEnd = 30 + params.prInterval + params.qrsDuration;
+  const tailGap = 40;
+  const maxQt = rrMs - qrsEnd - tailGap;
+  if (maxQt >= params.qtInterval) return params.qtInterval;
+  return Math.max(120, Math.min(params.qtInterval, maxQt));
+}
+
+function getVentricularTiming(params, extras, beatIndex = 0) {
+  const rrBase = 60000 / params.heartRate;
+  let rr = rrBase;
+  if (extras.irregular) rr = rrBase * (0.62 + beatRandom(beatIndex, 3) * 0.76);
+  else if (extras.avRatio && params.flutterWaves) rr = 60000 / (300 / extras.avRatio);
+  const rate = 60000 / rr;
+  const smallSq = rr / 40;
+  const largeSq = rr / 200;
+  return { rr, rate, smallSq, largeSq };
 }
 
 function minBeatIntervalMs(params, extras) {
@@ -1415,8 +1467,16 @@ function getEffectiveParams(baseParams, condition, extras) {
 /* ============================================================
    SECTION: Canvas Rendering
    ============================================================ */
-function drawPaperGrid(ctx, w, h, scales) {
+function drawPaperGrid(ctx, w, h, scales, opts) {
   const g = scales?.pxPerMm ?? renderPxPerMm();
+  const msToPx = scales?.msToPx ?? renderMsToPxScale();
+  const yAt = opts?.yAt;
+  const scrollOffset = opts?.scrollOffset || 0;
+  const compact = !!opts?.compact || w < 130 || h < 56;
+  const showTitles = !!opts?.showTitles && !compact;
+  const bigBoxMs = 200;
+  const labelPad = compact ? 10 : 14;
+
   ctx.fillStyle = '#FFF5F5';
   ctx.fillRect(0, 0, w, h);
   ctx.strokeStyle = 'rgba(192,57,43,0.18)';
@@ -1427,6 +1487,61 @@ function drawPaperGrid(ctx, w, h, scales) {
   ctx.lineWidth = 1;
   for (let x = 0; x < w; x += g * 5) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
   for (let y = 0; y < h; y += g * 5) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+
+  if (!yAt) return;
+
+  ctx.save();
+  const fontSize = Math.max(7, Math.round(g * (compact ? 0.42 : 0.52)));
+  ctx.font = `${fontSize}px 'Source Sans 3', sans-serif`;
+  ctx.fillStyle = 'rgba(44,62,80,0.55)';
+
+  const formatTimeSec = (ms) => {
+    const sec = ms / 1000;
+    return sec < 1 ? sec.toFixed(1) : (sec % 1 === 0 ? String(sec) : sec.toFixed(1));
+  };
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  const timeStep = compact ? g * 10 : g * 5;
+  for (let x = timeStep; x < w - 2; x += timeStep) {
+    const ms = Math.round(((x + scrollOffset) / msToPx) / bigBoxMs) * bigBoxMs;
+    const label = compact ? formatTimeSec(ms) : `${formatTimeSec(ms)} s`;
+    ctx.fillText(label, x, h - 2);
+  }
+
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const baselineY = yAt(0);
+  const xLabel = compact ? g * 3.2 : g * 4.5;
+  if (baselineY >= labelPad && baselineY <= h - labelPad) {
+    ctx.fillText(compact ? '0' : '0 mV', xLabel, baselineY);
+  }
+  const majorMv = 0.5;
+  const mvStep = compact ? 1.0 : 0.5;
+  for (let mv = majorMv; ; mv += mvStep) {
+    const yPos = yAt(mv);
+    if (yPos < labelPad) break;
+    ctx.fillText(compact ? `+${mv}` : `+${mv.toFixed(1)} mV`, xLabel, yPos);
+  }
+  for (let mv = -majorMv; ; mv -= mvStep) {
+    const yPos = yAt(mv);
+    if (yPos > h - labelPad) break;
+    ctx.fillText(compact ? `${mv}` : `${mv.toFixed(1)} mV`, xLabel, yPos);
+  }
+
+  if (showTitles) {
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('Time (s)', w / 2, h - 1);
+    ctx.save();
+    ctx.translate(10, h / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('mV', 0, 0);
+    ctx.restore();
+  }
+  ctx.restore();
 }
 
 function drawCalibration(ctx, x0, yMid, scales) {
@@ -1435,8 +1550,8 @@ function drawCalibration(ctx, x0, yMid, scales) {
   ctx.lineWidth = 2.25 * getContentScale() * (scales ? MODAL_MAGNIFY : 1);
   ctx.lineJoin = 'miter';
   ctx.beginPath();
-  ctx.moveTo(x0, yMid); ctx.lineTo(x0, yMid - sz); ctx.lineTo(x0 + sz * 0.4, yMid - sz);
-  ctx.lineTo(x0 + sz * 0.4, yMid); ctx.stroke();
+  ctx.moveTo(x0, yMid); ctx.lineTo(x0, yMid - sz); ctx.lineTo(x0 + sz * 0.5, yMid - sz);
+  ctx.lineTo(x0 + sz * 0.5, yMid); ctx.stroke();
 }
 
 function dedupeSortedPoints(pts) {
@@ -1567,13 +1682,13 @@ function renderLeadCanvas(canvas, lead, params, condition, scrollOffset, duratio
   canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
-  drawPaperGrid(ctx, w, h);
   const dur = (durationSec != null ? durationSec : displaySecForWidth(w, params.heartRate)) * 1000;
   const pts = buildRhythm(params, lead, dur, condition);
   const mvToPx = renderMvToPxScale();
   const yAt = sharedExtents
     ? buildYMapperFromExtents(sharedExtents.peak, sharedExtents.trough, h, mvToPx)
     : buildYMapper(pts, h, mvToPx);
+  drawPaperGrid(ctx, w, h, null, { yAt, scrollOffset: 0, compact: w < 150 || h < 64 });
   drawCalibration(ctx, 8, yAt(0));
   drawTrace(ctx, pts, w, h, scrollOffset, 0, yAt, false);
 }
@@ -1919,10 +2034,19 @@ function closeOverlay() {
 
 function updateModalMeasurements() {
   const p = getCurrentParams();
+  const extras = getRhythmExtras(getCondition());
+  const { rr, rate, smallSq, largeSq } = getVentricularTiming(p, extras);
+  const irregular = !!extras.irregular;
+  const qtShown = Math.round(effectiveQtForRate(p, rr));
+  const rateText = irregular ? `~${Math.round(rate)} bpm (avg)` : `${Math.round(rate)} bpm`;
+  const rrText = irregular ? `${Math.round(rr)} ms (varies)` : `${Math.round(rr)} ms`;
+  const gridHint = irregular
+    ? 'Use 6-second strip: count R waves in 30 large □, ×10'
+    : `${largeSq.toFixed(1)} large □ · ${smallSq.toFixed(1)} small □ between R peaks → 300÷${largeSq.toFixed(1)}≈${Math.round(300 / largeSq)} · 1500÷${smallSq.toFixed(1)}≈${Math.round(1500 / smallSq)} bpm`;
   document.getElementById('measure-labels').innerHTML =
     `<p><strong>PR:</strong> ${Math.round(p.prInterval)} ms &nbsp; <strong>QRS:</strong> ${Math.round(p.qrsDuration)} ms &nbsp;
-     <strong>QT:</strong> ${Math.round(p.qtInterval)} ms &nbsp; <strong>R-R:</strong> ${Math.round(60000 / p.heartRate)} ms &nbsp;
-     <strong>Rate:</strong> ${Math.round(p.heartRate)} bpm</p>`;
+     <strong>QT:</strong> ${qtShown} ms &nbsp; <strong>R-R:</strong> ${rrText} &nbsp; <strong>Rate:</strong> ${rateText}</p>
+     <p style="margin-top:4px;font-size:.74rem;color:var(--grey)">${gridHint}</p>`;
 }
 
 function renderModalCanvas() {
@@ -1941,7 +2065,6 @@ function renderModalCanvas() {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const scales = getModalRenderScale();
-  drawPaperGrid(ctx, w, h, scales);
   const cond = getCondition();
   const params = getCurrentParams();
   const pxPerMs = scales.msToPx;
@@ -1950,12 +2073,14 @@ function renderModalCanvas() {
   if (state.modal.isRhythm) {
     const rhythm = getScrollingRhythm(params, cond, state.modal.lead, msVisible, modalSpread);
     const yAt = buildYMapper(rhythm.points, h, scales.mvToPx);
+    drawPaperGrid(ctx, w, h, scales, { yAt, scrollOffset: state.scrollOffset, showTitles: true });
     drawCalibration(ctx, 12, yAt(0), scales);
     drawTrace(ctx, rhythm.points, w, h, state.scrollOffset % rhythm.loopPx, rhythm.loopMs, yAt, true, scales);
   } else {
     const durationMs = modalDurationMs(params, cond, w, pxPerMs);
     const pts = buildRhythm(params, state.modal.lead, durationMs, cond, modalSpread);
     const yAt = buildYMapper(pts, h, scales.mvToPx);
+    drawPaperGrid(ctx, w, h, scales, { yAt, showTitles: true });
     drawCalibration(ctx, 12, yAt(0), scales);
     drawTrace(ctx, pts, w, h, 0, 0, yAt, false, scales);
   }
@@ -1984,12 +2109,12 @@ function animateRhythmStrip(ts) {
     canvas.style.height = h + 'px';
     const ctx = canvas.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    drawPaperGrid(ctx, w, h);
     const cond = getCondition();
     const params = getCurrentParams();
     const msVisible = w / pxPerMs;
     const rhythm = getScrollingRhythm(params, cond, 'II', msVisible);
     const yAt = buildYMapper(rhythm.points, h, renderMvToPxScale());
+    drawPaperGrid(ctx, w, h, null, { yAt, scrollOffset: state.scrollOffset, compact: w < 200 });
     drawCalibration(ctx, 8, yAt(0));
     drawTrace(ctx, rhythm.points, w, h, state.scrollOffset % rhythm.loopPx, rhythm.loopMs, yAt, true);
   }
