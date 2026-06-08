@@ -77,9 +77,11 @@ header p{font-size:.82rem;color:var(--grey);margin-top:2px}
 .step-btn{width:28px;height:28px;border:1px solid var(--border);background:#fff;color:var(--navy);font-size:1rem;line-height:1;cursor:pointer;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0}
 .step-btn:hover{border-color:var(--accent);color:var(--accent)}
 .step-reset{font-size:.85rem;font-weight:400}
-.metabolic-val{min-width:52px;text-align:center;font-size:.82rem;font-weight:600;font-variant-numeric:tabular-nums}
-.metabolic-val.abnormal{color:var(--amber)}
-.metabolic-val.critical{color:var(--crit)}
+.metabolic-input{width:68px;padding:4px 6px;border:1px solid var(--border);background:#fff;font-family:'Source Sans 3',sans-serif;font-size:.82rem;font-weight:600;text-align:center;font-variant-numeric:tabular-nums;border-radius:3px;appearance:textfield;-moz-appearance:textfield}
+.metabolic-input::-webkit-outer-spin-button,.metabolic-input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.metabolic-input:focus{outline:none;border-color:var(--accent)}
+.metabolic-input.abnormal{color:var(--amber);border-color:var(--amber)}
+.metabolic-input.critical{color:var(--crit);border-color:var(--crit)}
 .metabolic-unit{font-size:.65rem;color:var(--grey);text-align:center}
 .btn{display:inline-block;padding:6px 14px;font-size:.78rem;font-family:'Source Sans 3',sans-serif;border:1px solid var(--border);background:#fff;color:var(--navy);cursor:pointer;font-weight:600}
 .btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -1775,6 +1777,12 @@ function labStatus(def, val) {
   return 'abnormal';
 }
 
+function clampLabValue(def, val) {
+  let v = Math.max(def.min, Math.min(def.max, val));
+  v = Math.round(v / def.step) * def.step;
+  return parseFloat(v.toFixed(def.decimals));
+}
+
 function buildLabControl(def, container) {
   const row = document.createElement('div');
   row.className = 'metabolic-row';
@@ -1788,13 +1796,28 @@ function buildLabControl(def, container) {
     <div class="metabolic-stepper">
       <button type="button" class="step-btn" data-action="minus" aria-label="Decrease">−</button>
       <div>
-        <div class="metabolic-val" id="lab-val-${def.key}"></div>
+        <input type="number" class="metabolic-input" id="lab-input-${def.key}"
+          min="${def.min}" max="${def.max}" step="${def.step}"
+          aria-label="${def.label} value">
         <div class="metabolic-unit">${def.unit || ''}</div>
       </div>
       <button type="button" class="step-btn" data-action="plus" aria-label="Increase">+</button>
       <button type="button" class="step-btn step-reset" data-action="reset" title="Reset to normal" aria-label="Reset to normal">↺</button>
     </div>`;
   container.appendChild(row);
+  const input = row.querySelector('.metabolic-input');
+  const commitInput = () => {
+    const raw = parseFloat(input.value);
+    if (!isFinite(raw)) {
+      input.value = formatLabValue(def, state.metabolicLevels[def.key]);
+      return;
+    }
+    state.metabolicLevels[def.key] = clampLabValue(def, raw);
+    afterLabChange();
+  };
+  input.addEventListener('change', commitInput);
+  input.addEventListener('blur', commitInput);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } });
   row.querySelector('[data-action="minus"]').onclick = () => adjustLab(def.key, -def.step);
   row.querySelector('[data-action="plus"]').onclick = () => adjustLab(def.key, def.step);
   row.querySelector('[data-action="reset"]').onclick = () => resetLab(def.key);
@@ -1822,10 +1845,10 @@ function buildLabControls() {
 function updateLabUI() {
   ECG_LAB_DEFS.forEach(def => {
     const val = state.metabolicLevels[def.key];
-    const el = document.getElementById(`lab-val-${def.key}`);
+    const el = document.getElementById(`lab-input-${def.key}`);
     if (!el) return;
-    el.textContent = formatLabValue(def, val);
-    el.className = 'metabolic-val ' + labStatus(def, val);
+    el.value = formatLabValue(def, val);
+    el.className = 'metabolic-input ' + labStatus(def, val);
   });
   updateConditionDisplay();
 }
@@ -1833,10 +1856,7 @@ function updateLabUI() {
 function adjustLab(key, delta) {
   const def = ECG_LAB_DEFS.find(d => d.key === key);
   if (!def) return;
-  let val = state.metabolicLevels[key] + delta;
-  val = Math.round(Math.max(def.min, Math.min(def.max, val)) / def.step) * def.step;
-  val = parseFloat(val.toFixed(def.decimals));
-  state.metabolicLevels[key] = val;
+  state.metabolicLevels[key] = clampLabValue(def, state.metabolicLevels[key] + delta);
   afterLabChange();
 }
 
