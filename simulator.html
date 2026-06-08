@@ -111,6 +111,8 @@ select{font-family:'Source Sans 3',sans-serif;font-size:.78rem;padding:4px 6px;b
 .rhythm-section canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block}
 .rhythm-label{position:absolute;top:3px;left:6px;font-size:.72rem;font-weight:700;font-family:'Libre Baskerville',serif;color:var(--navy);z-index:2;pointer-events:none}
 .rhythm-beam{position:absolute;top:0;right:0;width:2px;height:100%;background:var(--accent);opacity:.6;z-index:2;pointer-events:none}
+.rhythm-pause-btn{position:absolute;top:6px;right:8px;z-index:3;padding:4px 10px;font-size:.72rem;pointer-events:auto}
+.rhythm-pause-btn.btn{border-radius:4px}
 .overlay{position:fixed;inset:0;background:rgba(44,62,80,.5);z-index:100;display:none;align-items:center;justify-content:center}
 .overlay.open{display:flex}
 .overlay-box{background:#fff;border:1px solid var(--border);padding:20px 24px;width:min(960px,94vw);max-height:92vh;overflow:auto;box-shadow:0 8px 32px rgba(0,0,0,.2)}
@@ -365,6 +367,7 @@ select{font-family:'Source Sans 3',sans-serif;font-size:.78rem;padding:4px 6px;b
         <div class="ecg-grid" id="ecg-grid"></div>
         <div class="rhythm-section" id="rhythm-section" title="Click to enlarge">
           <span class="rhythm-label">Lead II — Rhythm Strip</span>
+          <button class="btn rhythm-pause-btn" id="rhythm-pause-btn" type="button" aria-pressed="false" aria-label="Pause rhythm strip">Pause</button>
           <canvas id="rhythm-canvas"></canvas>
           <div class="rhythm-beam"></div>
         </div>
@@ -1718,6 +1721,7 @@ const state = {
   interpStart: null,
   interpFrom: null,
   scrollOffset: 0,
+  rhythmPaused: false,
   lastFrame: 0,
   leadCanvases: {},
   needsStaticRedraw: true,
@@ -2098,12 +2102,22 @@ function renderModalCanvas() {
   }
 }
 
+function setRhythmPaused(paused) {
+  state.rhythmPaused = !!paused;
+  const btn = document.getElementById('rhythm-pause-btn');
+  if (btn) {
+    btn.textContent = state.rhythmPaused ? 'Resume' : 'Pause';
+    btn.setAttribute('aria-pressed', state.rhythmPaused ? 'true' : 'false');
+    btn.setAttribute('aria-label', state.rhythmPaused ? 'Resume rhythm strip' : 'Pause rhythm strip');
+  }
+}
+
 function animateRhythmStrip(ts) {
   if (!state.lastFrame) state.lastFrame = ts;
-  const dt = ts - state.lastFrame;
+  const dt = state.rhythmPaused ? 0 : ts - state.lastFrame;
   state.lastFrame = ts;
   const pxPerMs = renderMsToPxScale();
-  state.scrollOffset += dt * pxPerMs * RHYTHM_SCROLL_FACTOR;
+  if (!state.rhythmPaused) state.scrollOffset += dt * pxPerMs * RHYTHM_SCROLL_FACTOR;
 
   if (state.needsStaticRedraw || state.interpStart !== null) {
     renderAllStatic();
@@ -2209,6 +2223,10 @@ function init() {
   validateMorphology();
 
   document.getElementById('reset-labs-btn').onclick = resetLabs;
+  document.getElementById('rhythm-pause-btn').onclick = (e) => {
+    e.stopPropagation(); // don't trigger rhythm-section click-to-enlarge
+    setRhythmPaused(!state.rhythmPaused);
+  };
   document.getElementById('print-btn').onclick = () => window.print();
   document.getElementById('overlay-close').onclick = closeOverlay;
   document.getElementById('overlay').onclick = e => { if (e.target.id === 'overlay') closeOverlay(); };
